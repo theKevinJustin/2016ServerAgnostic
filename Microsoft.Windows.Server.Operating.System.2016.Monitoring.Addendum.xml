@@ -2,7 +2,7 @@
   <Manifest>
     <Identity>
       <ID>Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum</ID>
-      <Version>1.0.5.6</Version>
+      <Version>1.0.5.8</Version>
     </Identity>
     <Name>Microsoft Windows Server Operating System 2016 Monitoring Addendum</Name>
     <References>
@@ -70,7 +70,7 @@
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1056.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1058.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather WINOS 2016+ alerts and close via on demand task
@@ -82,9 +82,9 @@
 
 # Constants section - modify stuff here:
 #=================================================================================
-# Assign script name variable for use in event logging.  
+# Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1056.ps1"
+$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1058.ps1"
 $EventID = "580"
 #=================================================================================
 
@@ -98,7 +98,7 @@ $whoami = whoami
 # Load MOMScript API
 $momapi = New-Object -comObject MOM.ScriptAPI
 #Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script is starting. `n Running as ($whoami).")
 #=================================================================================
 
 
@@ -114,6 +114,7 @@ $bag = $momapi.CreatePropertyBag()
 
 #For a simple example - get files in Windows Temp:
 $date = get-date -uFormat "%Y-%m-%d"
+$Age = [DateTime](Get-Date).AddDays(-1)
 
 # Grab past 24 hours
 if ( (get-date).DayOfWeek -ne "Monday" )
@@ -125,7 +126,7 @@ if ( (get-date).DayOfWeek -eq "Monday" )
 	$Time = [DateTime](Get-Date).AddDays(-3)
 	}
 	
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather WINOS 2016+ Alerts for date ($date).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather WINOS 2016+ Alerts for date ($date).")
 
 
 # Gather WINOS alerts
@@ -196,11 +197,10 @@ if ( $SCOMCoreReportAlerts.count -gt 0 )
 
 #============================================================
 
+$Result = "GOOD"
+$Message = "WINOS Monitors auto-closed for ($date)"
 
-  $Result = "GOOD"
-  $Message = "WINOS Monitors auto-closed for ($date)"
-
-  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n# WINOS Monitors auto-closed for ($date). `n `n$WINOSAMessage")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Report completed for ($date). `n `n$WINOSAMessage")
 
 #$bag.AddValue('Result',$Result)
 $bag.AddValue('Count',$Test)
@@ -211,10 +211,23 @@ $bag.AddValue('Summary',$WINOSAMessage)
 # Return all bags
 $bag
 #=================================================================================
-# End MAIN script section
 
 
-# Reset Monitors Script
+# Rule closure logic
+#=================================================================================
+$SCOMCoreRulesToClear = $SCOMCoreRuleAlerts | where { ( $_.TimeAdded -lt $Age ) }
+# Convert Age back to days for alert properties logging
+$Days = ((Get-date) - $Age).Days
+if ( $SCOMCoreRulesToClear.Count -gt 0 )
+	{
+	$SCOMCoreRulesToClear | Resolve-SCOMAlert -Comment "Closing $Days day old alerts after report alert generated - ADDS Addendum Automation DS"
+	}
+
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Proactive DailyTasks ADDS rule reset completed for ($date)")
+
+#=================================================================================
+# Reset Monitors Script base code modified
 # Put ps1 in mgmtpacks folder
 # https://sc.scomurr.com/scom-2012-monitor-reset-cleaning-up-the-environment/
 #	Download
@@ -223,61 +236,74 @@ $bag
 #Alternate
 #https://gallery.technet.microsoft.com/scriptcenter/Auto-reset-script-for-d8b775ca
 
+# Changed up logic to sort unique classes in mgmnt pack families.
+# Added Age variable for monitors thanks to Aris Somatis - $Age specified in top level variables
+# Cycling through monitors made reset loop huge ~650 monitors when only ~50 classes
+# New logic reduced runtime from 8 minutes to roughly 8 seconds
+#=================================================================================
 
-#
-# If Cleanup needed, array of report monitors
-#$SCOMCoreMonitors
-#$SCOMCoreMonitorAlerts.Count
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Monitor Reset automation started for ($date).")
+
 
 if ( $SCOMCoreReportAlerts.Count -gt 0 )
 	{
-	foreach ($MonitorDisplayName in $SCOMCoreMonitors.DisplayName)
+	# Get classes - Examples: Microsoft.Windows.Server.AD.2016.Discovery, Microsoft.Windows.Server.AD.Library
+		$Library = Get-SCOMManagementPack -name "Microsoft.Windows.Server.Library"
+		$Monitoring = $SCOMCoreMP
+		$Discovery = Get-SCOMManagementPack -name Microsoft.Windows.Server.2016.Discovery
+
+	# pack naming
+	$OSClasses = @(Get-SCOMClass -ManagementPack $Library; Get-SCOMClass -ManagementPack $Discovery; )
+	$OSClass = $OSClasses | sort -property Name -uniq
+	# Debug
+	$OSClass.Count
+
+	# Set up monitor objects to reset
+	foreach ($Class in $OSClass)
 		{
-		$Monitors = @(Get-SCOMMonitor -displayname $MonitorDisplayName)
-		# Set up monitor objects to reset
-		foreach ($Monitor in $Monitors)
+		$ActiveMonitors = @(Get-SCOMClassInstance -Class $Class | ? { ($_.healthstate -ne 'Success') -AND ( $_.healthstate -ne 'Uninitialized') -AND ($_.IsAvailable -eq $true) } )
+		# Debug
+		$ActiveMonitors.Count
+		# $ActiveMonitors | fl -property *
+		write-host "Found" $ActiveMonitors.Count "unhealthy monitors for class" $Class
+		foreach ( $UnhealthyOLDMonitor in $ActiveMonitors )
 			{
-			$MonitorClass = Get-SCOMClass -Id $Monitor.Target.Id
-			$ActiveMonitors = Get-SCOMClassInstance -Class $MonitorClass | ? { ($_.healthstate -ne 'Success') -AND ( $_.healthstate -ne 'Uninitialized') -AND ($_.IsAvailable -eq $true) }
-			write-host "Found" + $ActiveMonitors.Count + "active monitors."
-			if ( $ActiveMonitors -ne $null)
+			#if ( $UnhealthyOLDMonitor.AvailabilityLastModified -lt $Age )
+			if ( $UnhealthyOLDMonitor.StateLastModified -lt $Age )
 				{
-				foreach ($ActiveMonitor in $ActiveMonitors)
+				#$UnhealthyMonitors += $ActiveMonitors.Count
+				#UnhealthyOLDMonitor | select AvailabilityLastModified,Path,DisplayName
+				#$UnhealthyOLDMonitor.Count
+				#write-host "Found" + $UnhealthyOLDMonitor.Count + "unhealthy monitor beyond" $Age "days."
+				#write-host ""
+				if ( $ActiveMonitors.Count -gt 0)
 					{
-					write-host " Resetting Health State on '" +$ActiveMonitor.FullName + "'" 
-					$ActiveMonitor.ResetMonitoringState($Monitor.ID)
+					foreach ( $ActiveMonitor in $UnhealthyOLDMonitor )
+						{
+						# Debug
+						$ActiveMonitor.ID
+						write-host " Resetting Health State on '" + $ActiveMonitor.FullName + "'" 
+						write-host ""
+						$ActiveMonitor.ResetMonitoringState($ActiveMonitor)
+						}
 					}
 				}
 			}
 		}
+	# Debug
+	#$MonitorClass | fl -property *
+	#$MonitorClass | select DisplayName,ID
 	}
 
 
+# Debug Write event for rule closure
+#=================================================================================
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS monitor reset completed for ($date)")
 
-#
-# (Rules) Alerts to auto close after reset monitor
-#$SCOMCoreRules
-#$SCOMCoreRuleAlerts.Count
-
-# Example OS rules
-# NTFS reported the logical disk is in error or corrupt.
-# NTFS - Delayed Write Lost
-
-# Resolve alerts after report built
-if ( $SCOMCoreReportAlerts.Count -gt 0 )
-	{
-	$SCOMCoreRuleAlerts | Resolve-SCOMAlert -Comment "Closing daily alert flood after report alert generated - OS Addendum automation DS"
-	}
-
-$OSAlertstoClose = get-scomalert | ? { ( $_.Name -like "NTFS *" ) `
-    -OR ( $_.Name -like "*Corruptions*" ) `
-    -OR ( $_.Name -eq "SMB Witness client received error from a SMB Witness server" ) `
-	} | ? { $_.ResolutionState -ne "255" } 
-
-if ( $OSAlertstoClose.Count -gt 0 )
-	{
-	$OSAlertstoClose | Resolve-SCOMAlert -Comment "Closing daily alert flood after report alert generated - OS Addendum automation DS"
-	}
+#=================================================================================
+# End MAIN script section
 
 
 # End of script section
@@ -285,7 +311,7 @@ if ( $OSAlertstoClose.Count -gt 0 )
 #Log an event for script ending and total execution time.
 $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 #=================================================================================
 # End of script
                 </ScriptBody>
@@ -344,7 +370,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1056.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1058.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup
@@ -367,8 +393,8 @@ $DriveLetter
 
 # Constants section - modify stuff here:
 #=================================================================================
-# Assign script name variable for use in event logging.  
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1056.ps1"
+# Assign script name variable for use in event logging.
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1058.ps1"
 $EventID = "680"
 #=================================================================================
 
@@ -385,19 +411,19 @@ $momapi = New-Object -comObject MOM.ScriptAPI
 $bag = $momapi.CreatePropertyBag()
 
 #Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script is starting. `n Running as ($whoami).")
 #=================================================================================
 
 
 # Begin MAIN script section
 #=================================================================================
 #Log script parameters we received
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
 
 #For a simple example - get files in Windows Temp:
 $date = get-date -uFormat "%Y-%m-%d"
 
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather Proactive Disk Cleanup Alert report for date ($date).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather Proactive Disk Cleanup Alert report for date ($date).")
 
 $DSMessage = "Proactive Logical Disk Cleanup Alert for date ($date)."
 
@@ -409,7 +435,7 @@ if ($Driveletter -eq "C" )
 	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -eq "C:" }
 	$CFreeSpace.DeviceID
 	$CFreeSpace
-	
+
  	$DeviceDriveLetter = $CFreeSpace.DeviceID
 	$DeviceDriveLetter
 
@@ -423,9 +449,9 @@ if ($Driveletter -eq "C" )
 		Size = [math]::Round($CFreeSpace.Size/1GB,2)
 		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
        }
- 
+
 	$DiskFreeSpace
- 
+
 	$SoftwareDistribution = (gci C:\windows\SoftwareDistribution | measure length -s).sum / 1Mb
 	# Debug
 	$SoftwareDistribution
@@ -449,14 +475,14 @@ if ($Driveletter -eq "C" )
 		{
 		$User = (gci $DriveLetter\users -Recurse | measure length -s).sum
 		}
-		
+
 	$UserSize = [math]::Round($User/1GB,2) 
 	$CUsersTableObject += "$($UserSize) = Size of C:\Users directory"
 	$CUsersTableObject += ""
 	$CUsersTableObject
-	
+
 	$ProfileTableObject = @()
-	
+
 	# Loop through profiles
 	foreach ($Profile in $Profiles)
 		{
@@ -553,7 +579,7 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 	# $DriveLetter = "C"
 	$ExpandC = get-volume
 	$ExpandAction = $ExpandC | ? { ( $_.SizeRemaining -gt "0" ) -AND ( $_.Driveletter -eq "$DriveLetter" ) }
-	
+
 	if ( $ExpandAction.DriveLetter -eq $true)
 		{
 		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Expand drive via Disk Manager on ($ComputerName)")
@@ -564,15 +590,15 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 	#==================================
 	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
 	$CFreeSpace.DeviceID
- 
+
 	$DiskFreeSpace = [pscustomobject]@{
 		DeviceID = $CFreeSpace.DeviceID
 		Size = [math]::Round($CFreeSpace.Size/1GB,2)
 		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
         }
- 
+
 	$DiskFreeSpace
- 
+
 	$DeviceDriveLetter = $CFreeSpace.DeviceID
 	$DeviceDriveLetter
  
@@ -581,9 +607,9 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 	#$CheckCDriveFolders = (gci C:).Name | ? { ( $_ -ne "Users" ) -AND ( $_ -ne "Windows" )  }
 	$CheckCDriveFolders = (gci $DeviceDriveLetter -directory).Name | ? { ( $_ -ne "Users" ) }
 	$CheckCDriveFolders
- 
+
 	$Cfolders = @()
- 
+
 	Foreach ( $folder in $CheckCDriveFolders )
 		{
 		#$folder
@@ -594,7 +620,7 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 		if ( $PSVersionTable.PSVersion.Major -lt 5 )
 			{
 			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse | Measure-Object -Property Length -Sum ).sum
-			}	
+			}
 		$Size
 
 		$CFolders += [pscustomobject]@{
@@ -615,7 +641,7 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 		{
 		Write-host "NO SME/SystemOwner/SysAdmin/Server Action required"
 		}
-		 
+
 	If ( $SoftwareDistribution -gt "3000" )
 		{
 		Write-host "SME/SystemOwner/SysAdmin/Server Action required, stopping Windows Update service, removing SoftwareDIstribution folder and restarting"
@@ -631,7 +657,7 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 	#	{
 	#	# Years older than 
 	#	$HowOld = [DateTime]::Now.AddYears(-1)
-	#	$RecentUse = [DateTime]::Now.AddDays(-90) 
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
 	#	# Path to root folder 
 	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC1\*.log" 
 	#	# Deletion task 
@@ -642,49 +668,49 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 	#	{
 	#	# Years older than 
 	#	$HowOld = [DateTime]::Now.AddYears(-1)
-	#	$RecentUse = [DateTime]::Now.AddDays(-90) 
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
 	#	# Path to root folder 
-	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log" 
+	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log"
 	#	# Deletion task 
 	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#	}
 
 	# D drive Event cleanup
-	$DeviceDriveLetter
+	#$DeviceDriveLetter
 	#If ( $DeviceDriveLetter -eq "D:" )
 	#	{
-	#	If ( Test-Path "D:\Domain Event Logs\Domain Controllers" ) 
+	#	If ( Test-Path "D:\Domain Event Logs\Domain Controllers" )
 	#		{
 	#		# Years older than 
 	#		$HowOld = [DateTime]::Now.AddYears(-2)
 	#		$RecentUse = [DateTime]::Now.AddDays(-7) 
 	#		# Path to root folder 
-	#		$Path = "D:\Domain Event Logs\Domain Controllers\*.evt" 
-	#		# Deletion task 
-			get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
+	#		$Path = "D:\Domain Event Logs\Domain Controllers\*.evt"
+	#		# Deletion task
+	#		get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
 		
 		# Cleanup IIS log files
 		#=====================
 	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC1 )
 	#		{
-	#		# Years older than 
+	#		# Years older than
 	#		$HowOld = [DateTime]::Now.AddYears(-1)
-	#		$RecentUse = [DateTime]::Now.AddDays(-90) 
-	#		# Path to root folder 
-	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log" 
-	#		# Deletion task 
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log"
+	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#		}
 
 	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC2 )
 	#		{
-	#		# Years older than 
+	#		# Years older than
 	#		$HowOld = [DateTime]::Now.AddYears(-1)
-	#		$RecentUse = [DateTime]::Now.AddDays(-90) 
-	#		# Path to root folder 
-	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log" 
-	#		# Deletion task 
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log"
+	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#		}
 	#	}
@@ -711,11 +737,11 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 
 	#	if ( Test-Path "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup )
 	#		{
-	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-	#		# If older than 14 days 
-	#		$HowOld= [DateTime]::Now.AddDays(-14) 
-	#		$RecentUse = [DateTime]::Now.AddDays(-14) 
-	#		# Path to root folder 
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
 	#		$Path = "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
 	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
@@ -724,24 +750,24 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 
 	#	if ( Test-Path "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup" )
 	#		{
-	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-	#		# If older than 14 days 
-	#		$HowOld= [DateTime]::Now.AddDays(-14) 
-	#		$RecentUse = [DateTime]::Now.AddDays(-14) 
-	#		# Path to root folder 
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
 	#		$Path = "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
 	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
 	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#		}
-		
+
 	#	if ( Test-Path "G:\Backup )
 	#		{
-	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-	#		# If older than 14 days 
-	#		$HowOld= [DateTime]::Now.AddDays(-14) 
-	#		$RecentUse = [DateTime]::Now.AddDays(-14) 
-	#		# Path to root folder 
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
 	#		$Path = "G:\Backup\*.bak"
 	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
@@ -810,16 +836,16 @@ $CdriveCleanupReport
 
 #Check the value of $strCondition
 IF ($strCondition -eq "Good")
-{
+	{
 	$momapi.LogScriptEvent($ScriptName,$EventID,0,"NO SME/SystemOwner/SysAdmin/Server action required")
 	$bag.AddValue('Result',$strCondition)
-}
+	}
 IF ($strCondition -eq "Bad")
-{
+	{
 	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$CdriveCleanupReport")
 	$bag.AddValue('Result',$strCondition)
 	$bag.AddValue('Summary',$CdriveCleanupReport)
-}
+	}
 
 # Return all bags
 $bag
@@ -832,7 +858,7 @@ $bag
 #Log an event for script ending and total execution time.
 $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 #=================================================================================
 # End of script
                 </ScriptBody>
@@ -879,7 +905,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1056.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1058.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather GroupPolicyReport alerts and close via on demand task
@@ -891,9 +917,9 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
 
 # Constants section - modify stuff here:
 #=================================================================================
-# Assign script name variable for use in event logging.  
+# Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1056.ps1"
+$ScriptName = "Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1058.ps1"
 $EventID = "552"
 #=================================================================================
 
@@ -907,7 +933,7 @@ $whoami = whoami
 # Load MOMScript API
 $momapi = New-Object -comObject MOM.ScriptAPI
 #Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script is starting. `n Running as ($whoami).")
 #=================================================================================
 
 
@@ -933,7 +959,7 @@ if ( (get-date).DayOfWeek -eq "Monday" )
 	$Time = [DateTime](Get-Date).AddDays(-3)
 	}
 
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather Group Policy update failed alerts for date ($date).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather Group Policy update failed alerts for date ($date).")
   $Message = "Group Policy Update Failed Daily Report for ($date)"
   
 
@@ -1041,11 +1067,11 @@ if ( $GroupPolicyAlerts.Count -eq 0 )
 	$GroupPolicyTeamReport += "ZERO alerts for GroupPolicy report for ($date)"
 	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$Message")
 	}
-	
+
 if ( $GroupPolicyAlerts.Count -gt 0 )
 	{
 	#
-	# Create table output	
+	# Create table output
 
 	#
 	# Show ADDS alerts by Time Raised,NetBiosComputerName,Message
@@ -1074,7 +1100,7 @@ if ( $GroupPolicyAlerts.Count -gt 0 )
 		$GroupPolicyTeamReport += "ZERO Group Policy Object issues for ($date)."
 		$GroupPolicyTeamReport += ""
 		}
-		
+
 	if ( $GroupPolicyOpenAlerts.count -gt 0 )
 		{
 		$GroupPolicyTeamReport += "# Group Policy Object (GPO) alert detail"
@@ -1090,7 +1116,7 @@ if ( $GroupPolicyAlerts.Count -gt 0 )
 		$GroupPolicyTeamReport += "ZERO Policy Update Failure Rule issues for ($date)."
 		$GroupPolicyTeamReport += ""
 		}
-		
+
 	if ( $GroupPolicyOpenRuleAlerts.count -gt 0 )
 		{
 		$GroupPolicyTeamReport += "# Policy Update Failure Rule alert detail"
@@ -1106,7 +1132,7 @@ if ( $GroupPolicyAlerts.Count -gt 0 )
 		$GroupPolicyTeamReport += "ZERO GroupPolicy remaining Operating System and issues for ($date)."
 		$GroupPolicyTeamReport += ""
 		}
-		
+
 	if ( $GroupPolicyRemaining.count -gt 0 )
 		{
 		$GroupPolicyTeamReport += "# Other GroupPolicy application OR Operating System issues "
@@ -1124,10 +1150,10 @@ $GroupPolicyTeamReport = $ADDSTeamReport | out-string
 
 #============================================================
 
-  $Result = "GOOD"
-  $Message = "GroupPolicy Daily report for ($date)"
+$Result = "GOOD"
+$Message = "GroupPolicy Daily report for ($date)"
 
-  $momapi.LogScriptEvent($ScriptName,$EventID,0,"$GroupPolicyTeamReport")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"$GroupPolicyTeamReport")
 
 #$bag.AddValue('Result',$Result)
 $bag.AddValue('Count',$Test)
@@ -1138,14 +1164,14 @@ $bag.AddValue('Summary',$GroupPolicyTeamReport)
 $bag
 #=================================================================================
 # End MAIN script section
- 
-  
+
+
 # End of script section
 #=================================================================================
 #Log an event for script ending and total execution time.
 $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 #=================================================================================
 # End of script
                 </ScriptBody>
@@ -1186,7 +1212,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-          <ScriptName>Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1054.ps1</ScriptName>
+          <ScriptName>Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1058.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Script to check event log size, retention, and overwrite properties WHEN alert cuts for Event Log is full
@@ -1200,7 +1226,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1054.ps1"
+$ScriptName = "Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1058.ps1"
 $EventID = "3750"
 #=================================================================================
 
@@ -1321,7 +1347,7 @@ IF ( $EventLogs -gt 0 )
 #Log an event for script ending and total execution time.
 $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
 #=================================================================================
 # End of script
@@ -1350,7 +1376,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1056.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1058.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather WINOS 2012 alerts and close via on demand task
@@ -1362,11 +1388,12 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
 
 # Constants section - modify stuff here:
 #=================================================================================
-# Assign script name variable for use in event logging.  
+# Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1056.ps1"
+$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1058.ps1"
 $EventID = "581"
 #=================================================================================
+
 
 # Starting Script section - All scripts get this
 #=================================================================================
@@ -1377,7 +1404,7 @@ $whoami = whoami
 # Load MOMScript API
 $momapi = New-Object -comObject MOM.ScriptAPI
 #Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script is starting. `n Running as ($whoami).")
 #=================================================================================
 
 
@@ -1393,6 +1420,7 @@ $bag = $momapi.CreatePropertyBag()
 
 #For a simple example - get files in Windows Temp:
 $date = get-date -uFormat "%Y-%m-%d"
+$Age = [DateTime](Get-Date).AddDays(-1)
 
 # Grab past 24 hours
 if ( (get-date).DayOfWeek -ne "Monday" )
@@ -1404,7 +1432,7 @@ if ( (get-date).DayOfWeek -eq "Monday" )
 	$Time = [DateTime](Get-Date).AddDays(-3)
 	}
 	
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather WINOS 2016+ Alerts for date ($date).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather WINOS 2016+ Alerts for date ($date).")
 
 
 # Gather WINOS alerts
@@ -1475,11 +1503,10 @@ if ( $SCOMCoreReportAlerts.count -gt 0 )
 
 #============================================================
 
+$Result = "GOOD"
+$Message = "WINOS Monitors auto-closed for ($date)"
 
-  $Result = "GOOD"
-  $Message = "WINOS Monitors auto-closed for ($date)"
-
-  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n# WINOS Monitors auto-closed for ($date). `n `n$WINOSAMessage")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Report completed for ($date). `n `n$WINOSAMessage")
 
 #$bag.AddValue('Result',$Result)
 $bag.AddValue('Count',$Test)
@@ -1490,10 +1517,23 @@ $bag.AddValue('Summary',$WINOSAMessage)
 # Return all bags
 $bag
 #=================================================================================
-# End MAIN script section
 
 
-# Reset Monitors Script
+# Rule closure logic
+#=================================================================================
+$SCOMCoreRulesToClear = $SCOMCoreRuleAlerts | where { ( $_.TimeAdded -lt $Age ) }
+# Convert Age back to days for alert properties logging
+$Days = ((Get-date) - $Age).Days
+if ( $SCOMCoreRulesToClear.Count -gt 0 )
+	{
+	$SCOMCoreRulesToClear | Resolve-SCOMAlert -Comment "Closing $Days day old alerts after report alert generated - ADDS Addendum Automation DS"
+	}
+
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Proactive DailyTasks ADDS rule reset completed for ($date)")
+
+#=================================================================================
+# Reset Monitors Script base code modified
 # Put ps1 in mgmtpacks folder
 # https://sc.scomurr.com/scom-2012-monitor-reset-cleaning-up-the-environment/
 #	Download
@@ -1502,61 +1542,74 @@ $bag
 #Alternate
 #https://gallery.technet.microsoft.com/scriptcenter/Auto-reset-script-for-d8b775ca
 
+# Changed up logic to sort unique classes in mgmnt pack families.
+# Added Age variable for monitors thanks to Aris Somatis - $Age specified in top level variables
+# Cycling through monitors made reset loop huge ~650 monitors when only ~50 classes
+# New logic reduced runtime from 8 minutes to roughly 8 seconds
+#=================================================================================
 
-#
-# If Cleanup needed, array of report monitors
-#$SCOMCoreMonitors
-#$SCOMCoreMonitorAlerts.Count
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Monitor Reset automation started for ($date).")
+
 
 if ( $SCOMCoreReportAlerts.Count -gt 0 )
 	{
-	foreach ($MonitorDisplayName in $SCOMCoreMonitors.DisplayName)
+	# Get classes - Examples: Microsoft.Windows.Server.AD.2016.Discovery, Microsoft.Windows.Server.AD.Library
+		$Library = Get-SCOMManagementPack -name "Microsoft.Windows.Server.Library"
+		$Monitoring = $SCOMCoreMP
+		$Discovery = Get-SCOMManagementPack -name Microsoft.Windows.Server.2016.Discovery
+
+	# pack naming
+	$OSClasses = @(Get-SCOMClass -ManagementPack $Library; Get-SCOMClass -ManagementPack $Discovery; )
+	$OSClass = $OSClasses | sort -property Name -uniq
+	# Debug
+	$OSClass.Count
+
+	# Set up monitor objects to reset
+	foreach ($Class in $OSClass)
 		{
-		$Monitors = @(Get-SCOMMonitor -displayname $MonitorDisplayName)
-		# Set up monitor objects to reset
-		foreach ($Monitor in $Monitors)
+		$ActiveMonitors = @(Get-SCOMClassInstance -Class $Class | ? { ($_.healthstate -ne 'Success') -AND ( $_.healthstate -ne 'Uninitialized') -AND ($_.IsAvailable -eq $true) } )
+		# Debug
+		$ActiveMonitors.Count
+		# $ActiveMonitors | fl -property *
+		write-host "Found" $ActiveMonitors.Count "unhealthy monitors for class" $Class
+		foreach ( $UnhealthyOLDMonitor in $ActiveMonitors )
 			{
-			$MonitorClass = Get-SCOMClass -Id $Monitor.Target.Id
-			$ActiveMonitors = Get-SCOMClassInstance -Class $MonitorClass | ? { ($_.healthstate -ne 'Success') -AND ( $_.healthstate -ne 'Uninitialized') -AND ($_.IsAvailable -eq $true) }
-			write-host "Found" + $ActiveMonitors.Count + "active monitors."
-			if ( $ActiveMonitors -ne $null)
+			#if ( $UnhealthyOLDMonitor.AvailabilityLastModified -lt $Age )
+			if ( $UnhealthyOLDMonitor.StateLastModified -lt $Age )
 				{
-				foreach ($ActiveMonitor in $ActiveMonitors)
+				#$UnhealthyMonitors += $ActiveMonitors.Count
+				#UnhealthyOLDMonitor | select AvailabilityLastModified,Path,DisplayName
+				#$UnhealthyOLDMonitor.Count
+				#write-host "Found" + $UnhealthyOLDMonitor.Count + "unhealthy monitor beyond" $Age "days."
+				#write-host ""
+				if ( $ActiveMonitors.Count -gt 0)
 					{
-					write-host " Resetting Health State on '" +$ActiveMonitor.FullName + "'" 
-					$ActiveMonitor.ResetMonitoringState($Monitor.ID)
+					foreach ( $ActiveMonitor in $UnhealthyOLDMonitor )
+						{
+						# Debug
+						$ActiveMonitor.ID
+						write-host " Resetting Health State on '" + $ActiveMonitor.FullName + "'" 
+						write-host ""
+						$ActiveMonitor.ResetMonitoringState($ActiveMonitor)
+						}
 					}
 				}
 			}
 		}
+	# Debug
+	#$MonitorClass | fl -property *
+	#$MonitorClass | select DisplayName,ID
 	}
 
 
+# Debug Write event for rule closure
+#=================================================================================
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS monitor reset completed for ($date)")
 
-#
-# (Rules) Alerts to auto close after reset monitor
-#$SCOMCoreRules
-#$SCOMCoreRuleAlerts.Count
-
-# Example OS rules
-# NTFS reported the logical disk is in error or corrupt.
-# NTFS - Delayed Write Lost
-
-# Resolve alerts after report built
-if ( $SCOMCoreReportAlerts.Count -gt 0 )
-	{
-	$SCOMCoreRuleAlerts | Resolve-SCOMAlert -Comment "Closing daily alert flood after report alert generated - OS Addendum automation DS"
-	}
-
-$OSAlertstoClose = get-scomalert | ? { ( $_.Name -like "NTFS *" ) `
-    -OR ( $_.Name -like "*Corruptions*" ) `
-    -OR ( $_.Name -eq "SMB Witness client received error from a SMB Witness server" ) `
-	} | ? { $_.ResolutionState -ne "255" } 
-
-if ( $OSAlertstoClose.Count -gt 0 )
-	{
-	$OSAlertstoClose | Resolve-SCOMAlert -Comment "Closing daily alert flood after report alert generated - OS Addendum automation DS"
-	}
+#=================================================================================
+# End MAIN script section
 
 
 # End of script section
@@ -1564,7 +1617,7 @@ if ( $OSAlertstoClose.Count -gt 0 )
 #Log an event for script ending and total execution time.
 $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 #=================================================================================
 # End of script
                 </ScriptBody>
@@ -1592,7 +1645,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1056.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1058.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Proactive 2016+ logical disk cleanup manual task
@@ -1611,7 +1664,7 @@ $ComputerName = $env:ComputerName
 #$DriveLetter = "C"
 $DriveLetter
 #=================================================================================
-$ScriptName = "Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1056.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1058.ps1"
 $EventID = "681"
 #=================================================================================
 
@@ -1837,7 +1890,7 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 		if ( $PSVersionTable.PSVersion.Major -lt 5 )
 			{
 			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse | Measure-Object -Property Length -Sum ).sum
-			}	
+			}
 		$Size
 
 		$CFolders += [pscustomobject]@{
@@ -1863,133 +1916,133 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 		{
 		Write-host "SME/SystemOwner/SysAdmin/Server Action required, stopping Windows Update service, removing SoftwareDIstribution folder and restarting"
 		Get-Service -Name wuauserv | Stop-Service 
-		Remove-Item -Path C:\Windows\SoftwareDistribution -Recurse 
+		Remove-Item -Path C:\Windows\SoftwareDistribution -Recurse
 		Get-Service -Name wuauserv | Start-Service
 		Write-host "Windows Update wuauserv service restarted after SoftwareDistribution directory removed"
 		}
 
 	# Cleanup IIS log files
 	#=====================
-	if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC1 )
-		{
-		# Years older than 
-		$HowOld = [DateTime]::Now.AddYears(-1)
-		$RecentUse = [DateTime]::Now.AddDays(-90) 
-		# Path to root folder 
-		$Path = "C:\inetpub\logs\LogFiles\W3SVC1\*.log" 
-		# Deletion task 
-		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-		}
+	# if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC1 )
+		# {
+		# # Years older than
+		# $HowOld = [DateTime]::Now.AddYears(-1)
+		# $RecentUse = [DateTime]::Now.AddDays(-90)
+		# # Path to root folder
+		# $Path = "C:\inetpub\logs\LogFiles\W3SVC1\*.log"
+		# # Deletion task
+		# get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+		# }
 
-	if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC2 )
-		{
-		# Years older than 
-		$HowOld = [DateTime]::Now.AddYears(-1)
-		$RecentUse = [DateTime]::Now.AddDays(-90) 
-		# Path to root folder 
-		$Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log" 
-		# Deletion task 
-		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-		}
+	# if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC2 )
+		# {
+		# # Years older than
+		# $HowOld = [DateTime]::Now.AddYears(-1)
+		# $RecentUse = [DateTime]::Now.AddDays(-90)
+		# # Path to root folder
+		# $Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log"
+		# # Deletion task
+		# get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+		# }
 
-	# D drive Event cleanup
-	$DeviceDriveLetter
-	If ( $DeviceDriveLetter -eq "D:" )
-		{
-		If ( Test-Path "D:\Domain Event Logs\Domain Controllers" ) 
-			{
-			# Years older than 
-			$HowOld = [DateTime]::Now.AddYears(-2)
-			$RecentUse = [DateTime]::Now.AddDays(-7) 
-			# Path to root folder 
-			$Path = "D:\Domain Event Logs\Domain Controllers\*.evt" 
-			# Deletion task 
-			get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
+	# # D drive Event cleanup
+	# $DeviceDriveLetter
+	# If ( $DeviceDriveLetter -eq "D:" )
+		# {
+		# If ( Test-Path "D:\Domain Event Logs\Domain Controllers" ) 
+			# {
+			# # Years older than 
+			# $HowOld = [DateTime]::Now.AddYears(-2)
+			# $RecentUse = [DateTime]::Now.AddDays(-7)
+			# # Path to root folder 
+			# $Path = "D:\Domain Event Logs\Domain Controllers\*.evt" 
+			# # Deletion task 
+			# get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+			# }
 		
-		# Cleanup IIS log files
-		#=====================
-		if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC1 )
-			{
-			# Years older than 
-			$HowOld = [DateTime]::Now.AddYears(-1)
-			$RecentUse = [DateTime]::Now.AddDays(-90) 
-			# Path to root folder 
-			$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log" 
-			# Deletion task 
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
+		# # Cleanup IIS log files
+		# #=====================
+		# if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC1 )
+			# {
+			# # Years older than 
+			# $HowOld = [DateTime]::Now.AddYears(-1)
+			# $RecentUse = [DateTime]::Now.AddDays(-90)
+			# # Path to root folder
+			# $Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log"
+			# # Deletion task
+			# get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+			# }
 
-		if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC2 )
-			{
-			# Years older than 
-			$HowOld = [DateTime]::Now.AddYears(-1)
-			$RecentUse = [DateTime]::Now.AddDays(-90) 
-			# Path to root folder 
-			$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log" 
-			# Deletion task 
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
-		}
+		# if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC2 )
+			# {
+			# # Years older than 
+			# $HowOld = [DateTime]::Now.AddYears(-1)
+			# $RecentUse = [DateTime]::Now.AddDays(-90)
+			# # Path to root folder 
+			# $Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log"
+			# # Deletion task 
+			# get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+			# }
+		# }
 
-		# Example for VEEAM backup files
-		#================================
-		If ( Test-Path "D:\Backup" )
-			{
-			# Years older than
-            $HowOld = [DateTime]::Now.AddYears(-2)
-            $RecentUse = [DateTime]::Now.AddDays(-10)
-			# Path to root folder
-            $Path = "D:\Backup\*.v*"
-			# Deletion task
-			get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld `
-				-and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
+		# # Example for VEEAM backup files
+		# #================================
+		# If ( Test-Path "D:\Backup" )
+			# {
+			# # Years older than
+            # $HowOld = [DateTime]::Now.AddYears(-2)
+            # $RecentUse = [DateTime]::Now.AddDays(-10)
+			# # Path to root folder
+            # $Path = "D:\Backup\*.v*"
+			# # Deletion task
+			# get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld `
+				# -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+			# }
 
-		# Cleanup SQL Backup files
-		#=====================
-		# Example paths
-		# G:\Backup
-		# S:\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup
+		# # Cleanup SQL Backup files
+		# #=====================
+		# # Example paths
+		# # G:\Backup
+		# # S:\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup
 
-		if ( Test-Path "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup )
-			{
-			# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-			# If older than 14 days 
-			$HowOld= [DateTime]::Now.AddDays(-14) 
-			$RecentUse = [DateTime]::Now.AddDays(-14) 
-			# Path to root folder 
-			$Path = "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
-			# Deletion task
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
-				-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
+		# if ( Test-Path "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup" )
+			# {
+			# # Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+			# # If older than 14 days
+			# $HowOld= [DateTime]::Now.AddDays(-14)
+			# $RecentUse = [DateTime]::Now.AddDays(-14)
+			# # Path to root folder
+			# $Path = "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
+			# # Deletion task
+			# get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+				# -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+			# }
 
-		if ( Test-Path "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup" )
-			{
-			# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-			# If older than 14 days 
-			$HowOld= [DateTime]::Now.AddDays(-14) 
-			$RecentUse = [DateTime]::Now.AddDays(-14) 
-			# Path to root folder 
-			$Path = "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
-			# Deletion task
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
-				-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
+		# if ( Test-Path "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup" )
+			# {
+			# # Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+			# # If older than 14 days
+			# $HowOld= [DateTime]::Now.AddDays(-14)
+			# $RecentUse = [DateTime]::Now.AddDays(-14)
+			# # Path to root folder
+			# $Path = "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
+			# # Deletion task
+			# get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+				# -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+			# }
 		
-		if ( Test-Path "G:\Backup )
-			{
-			# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-			# If older than 14 days 
-			$HowOld= [DateTime]::Now.AddDays(-14) 
-			$RecentUse = [DateTime]::Now.AddDays(-14) 
-			# Path to root folder 
-			$Path = "G:\Backup\*.bak"
-			# Deletion task
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
-				-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
+		# if ( Test-Path "G:\Backup" )
+			# {
+			# # Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+			# # If older than 14 days 
+			# $HowOld= [DateTime]::Now.AddDays(-14)
+			# $RecentUse = [DateTime]::Now.AddDays(-14)
+			# # Path to root folder
+			# $Path = "G:\Backup\*.bak"
+			# # Deletion task
+			# get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+				# -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+			# }
 
 	# Check folder size after cleanup
 	#==========================
@@ -2053,16 +2106,16 @@ $CdriveCleanupReport
 
 #Check the value of $strCondition
 IF ($strCondition -eq "Good")
-{
+	{
 	$momapi.LogScriptEvent($ScriptName,$EventID,0,"NO SME/SystemOwner/SysAdmin/Server action required")
 	$bag.AddValue('Result',$strCondition)
-}
+	}
 IF ($strCondition -eq "Bad")
-{
+	{
 	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$CdriveCleanupReport")
 	$bag.AddValue('Result',$strCondition)
 	$bag.AddValue('Summary',$CdriveCleanupReport)
-}
+	}
 
 # Return all bags
 $bag
@@ -2075,7 +2128,7 @@ $bag
 #Log an event for script ending and total execution time.
 $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 #=================================================================================
 # End of script
                 </ScriptBody>
@@ -2101,7 +2154,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Microsoft.Windows.Server.2016.Eventlog.Service.WA.v1056.ps1</ScriptName>
+                <ScriptName>Microsoft.Windows.Server.2016.Eventlog.Service.WA.v1058.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to restart a service
@@ -2122,7 +2175,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1056.ps1"
+$ScriptName = "Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1058.ps1"
 $EventID = "3750"
 #=================================================================================
 
@@ -2144,7 +2197,7 @@ $momapi = New-Object -comObject MOM.ScriptAPI
 [string]$ServiceName = "Eventlog"
 
 #Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Recovery script for service: ($ServiceName) is starting. `n Running as ($whoami).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Recovery script for service: ($ServiceName) is starting. `n Running as ($whoami).")
 write-host "Recovery script for service: ($ServiceName) is starting. Running as ($whoami)."
 
 #Get the service object
@@ -2152,25 +2205,25 @@ $Svc = Get-Service $ServiceName
 
 #Check to ensure the service exists:
 IF (!$Svc)
-{
-  $momapi.LogScriptEvent($ScriptName,3751,2, "`n Service ($ServiceName) was not found on this computer. `n This indicates a misconfiguration of the monitor. `n Error is ($error)")
-  write-host "Service ($ServiceName) was not found on this computer. This indicates a misconfiguration of the monitor. Error is ($error)"
-  EXIT
-}
+	{
+	$momapi.LogScriptEvent($ScriptName,3751,2, "Service ($ServiceName) was not found on this computer. `n This indicates a misconfiguration of the monitor. `n Error is ($error)")
+	write-host "Service ($ServiceName) was not found on this computer. This indicates a misconfiguration of the monitor. Error is ($error)"
+	EXIT
+	}
 
 #Get Service Status:
 [string]$SvcStatus = $Svc.Status
 
 #Do not continue is service is already running
 IF ($SvcStatus -eq "Running")
-{
-  $momapi.LogScriptEvent($ScriptName,3752,2, "`n Service ($ServiceName) was found to be in the Running state. `n This indicates a misconfiguration of the monitor. `n No recovery action will be taken.")
-  write-host "Service ($ServiceName) was found to be in the Running state. This indicates a misconfiguration of the monitor. No recovery action will be taken."
-  EXIT  
-}
+	{
+	$momapi.LogScriptEvent($ScriptName,3752,2, "Service ($ServiceName) was found to be in the Running state. `n This indicates a misconfiguration of the monitor. `n No recovery action will be taken.")
+	write-host "Service ($ServiceName) was found to be in the Running state. This indicates a misconfiguration of the monitor. No recovery action will be taken."
+	EXIT  
+	}
 
 #Log recovery information event
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) was found to be in the ($SvcStatus) state.  Recovery will be attempted.")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Service: ($ServiceName) was found to be in the ($SvcStatus) state.  Recovery will be attempted.")
 write-host "Service: ($ServiceName) was found to be in the ($SvcStatus) state.  Recovery will be attempted."
 
 #Attempt First Recovery
@@ -2183,49 +2236,49 @@ $Svc = Get-Service $ServiceName
 $SvcStatus = $Svc.Status
 
 IF ($SvcStatus -ne "Running")
-{
-  #Attempt Second Recovery
-  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) second attempt at recovering starting now.")
-  write-host "Service: ($ServiceName) second attempt at recovering starting now."  
-  Restart-Service -Name $ServiceName -Force
-  Start-Sleep 20
-  $Svc = Get-Service $ServiceName
-  $SvcStatus = $Svc.Status 
-}
+	{
+	#Attempt Second Recovery
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) second attempt at recovering starting now.")
+	write-host "Service: ($ServiceName) second attempt at recovering starting now."
+	Restart-Service -Name $ServiceName -Force
+	Start-Sleep 20
+	$Svc = Get-Service $ServiceName
+	$SvcStatus = $Svc.Status
+	}
 
 IF ($SvcStatus -ne "Running")
-{
-  #Attempt Third Recovery
-  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) third attempt at recovering starting now.")
-  write-host "Service: ($ServiceName) third attempt at recovering starting now."    
-  Restart-Service -Name $ServiceName -Force
-  Start-Sleep 20
-  $Svc = Get-Service $ServiceName
-  $SvcStatus = $Svc.Status 
-}
+	{
+	#Attempt Third Recovery
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) third attempt at recovering starting now.")
+	write-host "Service: ($ServiceName) third attempt at recovering starting now."
+	Restart-Service -Name $ServiceName -Force
+	Start-Sleep 20
+	$Svc = Get-Service $ServiceName
+	$SvcStatus = $Svc.Status
+	}
 
 IF ($SvcStatus -eq "Running")
-{
-  #Log event of a successful restart
-  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) was successfully restarted and then detected to be in the Running state.")
-  write-host "Service: ($ServiceName) was successfully restarted and then detected to be in the Running state."
-}
+	{
+	#Log event of a successful restart
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) was successfully restarted and then detected to be in the Running state.")
+	write-host "Service: ($ServiceName) was successfully restarted and then detected to be in the Running state."
+	}
 ELSE
-{
-  #Log event of a successful restart
-  $momapi.LogScriptEvent($ScriptName,3753,2,"`n Service: ($ServiceName) is not running. `n Recovery was attempted and failed. `n Manual interventon is required. `n The last detected service status was ($SvcStatus).") 
-  write-host "Service: ($ServiceName) is not running. Recovery was attempted and failed. Manual interventon is required. The last detected service status was ($SvcStatus)."
-}
+	{
+	#Log event of a successful restart
+	$momapi.LogScriptEvent($ScriptName,3753,2,"`n Service: ($ServiceName) is not running. `n Recovery was attempted and failed. `n Manual interventon is required. `n The last detected service status was ($SvcStatus).") 
+	write-host "Service: ($ServiceName) is not running. Recovery was attempted and failed. Manual interventon is required. The last detected service status was ($SvcStatus)."
+	}
 
 # Check to see if this recovery script has been run multiple times in the last x minutes for detection of too many recovery actions
 $Message = "*($ServiceName) is starting*"
 $Events = Get-EventLog -LogName 'Operations Manager' -After $StartTime.AddMinutes(-60) -Message $Message | where {$_.EventID -eq 3750}
 $EventCount = $Events.Count
 IF ($EventCount -ge 3)
-{
-  $momapi.LogScriptEvent($ScriptName,3754,2,"`n Too many service recoveries have been attempted for ($ServiceName). `n ($EventCount) recoveries are detected in the event log. `n Manual interventon is required.")
-  write-host "Too many service recoveries have been attempted for ($ServiceName). ($EventCount) recoveries are detected in the event log. Manual interventon is required."
-}
+	{
+	$momapi.LogScriptEvent($ScriptName,3754,2,"`n Too many service recoveries have been attempted for ($ServiceName). `n ($EventCount) recoveries are detected in the event log. `n Manual interventon is required.")
+	write-host "Too many service recoveries have been attempted for ($ServiceName). ($EventCount) recoveries are detected in the event log. Manual interventon is required."
+	}
 
 # End of script section
 #=================================================================================
@@ -2235,7 +2288,7 @@ $ScriptTime = ($EndTime - $StartTime).TotalSeconds
 $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
 #=================================================================================
-# End of script		  
+# End of script
 		  </ScriptBody>
                 <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
               </WriteAction>
@@ -3262,7 +3315,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
       <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1056.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1058.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -3285,37 +3338,21 @@ $DriveLetter
 
 # Constants section - modify stuff here:
 #=================================================================================
-# Assign script name variable for use in event logging.  
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1056.ps1"
+# Assign script name variable for use in event logging.
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1058.ps1"
 $EventID = "680"
-#=================================================================================
-
-
-# Starting Script section - All scripts get this
-#=================================================================================
-# Gather the start time of the script
-$StartTime = Get-Date
-#Set variable to be used in logging events
-$whoami = whoami
-# Load MOMScript API
-$momapi = New-Object -comObject MOM.ScriptAPI
-# Load PropertyBag function 
-$bag = $momapi.CreatePropertyBag()
-
-#Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
 #=================================================================================
 
 
 # Begin MAIN script section
 #=================================================================================
 #Log script parameters we received
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
 
 #For a simple example - get files in Windows Temp:
 $date = get-date -uFormat "%Y-%m-%d"
 
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather Proactive Disk Cleanup Alert report for date ($date).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather Proactive Disk Cleanup Alert report for date ($date).")
 
 $DSMessage = "Proactive Logical Disk Cleanup Alert for date ($date)."
 
@@ -3327,7 +3364,7 @@ if ($Driveletter -eq "C" )
 	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -eq "C:" }
 	$CFreeSpace.DeviceID
 	$CFreeSpace
-	
+
  	$DeviceDriveLetter = $CFreeSpace.DeviceID
 	$DeviceDriveLetter
 
@@ -3341,9 +3378,9 @@ if ($Driveletter -eq "C" )
 		Size = [math]::Round($CFreeSpace.Size/1GB,2)
 		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
        }
- 
+
 	$DiskFreeSpace
- 
+
 	$SoftwareDistribution = (gci C:\windows\SoftwareDistribution | measure length -s).sum / 1Mb
 	# Debug
 	$SoftwareDistribution
@@ -3367,14 +3404,14 @@ if ($Driveletter -eq "C" )
 		{
 		$User = (gci $DriveLetter\users -Recurse | measure length -s).sum
 		}
-		
+
 	$UserSize = [math]::Round($User/1GB,2) 
 	$CUsersTableObject += "$($UserSize) = Size of C:\Users directory"
 	$CUsersTableObject += ""
 	$CUsersTableObject
-	
+
 	$ProfileTableObject = @()
-	
+
 	# Loop through profiles
 	foreach ($Profile in $Profiles)
 		{
@@ -3431,6 +3468,7 @@ if ($DriveLetter -ne "C" )
 	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
 	$Before = [math]::Round($BeforeSize/1GB,2)
 
+	$DeviceDriveLetter;	cd \
     $DiskFreeSpace = [pscustomobject]@{
 		DeviceID = $DeviceDriveLetter
 		Size = [math]::Round($CFreeSpace.Size/1GB,2)
@@ -3470,7 +3508,7 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 	# $DriveLetter = "C"
 	$ExpandC = get-volume
 	$ExpandAction = $ExpandC | ? { ( $_.SizeRemaining -gt "0" ) -AND ( $_.Driveletter -eq "$DriveLetter" ) }
-	
+
 	if ( $ExpandAction.DriveLetter -eq $true)
 		{
 		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Expand drive via Disk Manager on ($ComputerName)")
@@ -3481,15 +3519,15 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 	#==================================
 	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
 	$CFreeSpace.DeviceID
- 
+
 	$DiskFreeSpace = [pscustomobject]@{
 		DeviceID = $CFreeSpace.DeviceID
 		Size = [math]::Round($CFreeSpace.Size/1GB,2)
 		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
         }
- 
+
 	$DiskFreeSpace
- 
+
 	$DeviceDriveLetter = $CFreeSpace.DeviceID
 	$DeviceDriveLetter
  
@@ -3498,9 +3536,9 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 	#$CheckCDriveFolders = (gci C:).Name | ? { ( $_ -ne "Users" ) -AND ( $_ -ne "Windows" )  }
 	$CheckCDriveFolders = (gci $DeviceDriveLetter -directory).Name | ? { ( $_ -ne "Users" ) }
 	$CheckCDriveFolders
- 
+
 	$Cfolders = @()
- 
+
 	Foreach ( $folder in $CheckCDriveFolders )
 		{
 		#$folder
@@ -3511,352 +3549,7 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 		if ( $PSVersionTable.PSVersion.Major -lt 5 )
 			{
 			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse | Measure-Object -Property Length -Sum ).sum
-			}	
-		$Size
-
-		$CFolders += [pscustomobject]@{
-			Directory = $folder
-			SizeGB = [math]::Round($Size/1GB,2)
 			}
-		}
-	$Cfolders  #| sort -property SizeGB -desc
-
-
-# Second attempt will clean up software distribution
-#==================================
-If ($DiskFreeSpace.FreeSpace -lt 5 )
-	{
-	# Audit Software Distribution
-	#==================================
-	If ( $SoftwareDistribution -lt "3000" )
-		{
-		Write-host "NO SME/SystemOwner/SysAdmin/Server Action required"
-		}
-		 
-	If ( $SoftwareDistribution -gt "3000" )
-		{
-		Write-host "SME/SystemOwner/SysAdmin/Server Action required, stopping Windows Update service, removing SoftwareDIstribution folder and restarting"
-		Get-Service -Name wuauserv | Stop-Service 
-		Remove-Item -Path C:\Windows\SoftwareDistribution -Recurse 
-		Get-Service -Name wuauserv | Start-Service
-		Write-host "Windows Update wuauserv service restarted after SoftwareDistribution directory removed"
-		}
-
-	# Cleanup IIS log files
-	#=====================
-	#if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC1 )
-		#{
-		# Years older than 
-		#$HowOld = [DateTime]::Now.AddYears(-1)
-		#$RecentUse = [DateTime]::Now.AddDays(-90) 
-		# Path to root folder 
-		#$Path = "C:\inetpub\logs\LogFiles\W3SVC1\*.log" 
-		# Deletion task 
-		#get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-		#}
-
-	#if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC2 )
-		#{
-		# Years older than 
-		#$HowOld = [DateTime]::Now.AddYears(-1)
-		#$RecentUse = [DateTime]::Now.AddDays(-90) 
-		# Path to root folder 
-		#$Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log" 
-		# Deletion task 
-		#get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-		#}
-
-	# D drive Event cleanup
-	$DeviceDriveLetter
-	#If ( $DeviceDriveLetter -eq "D:" )
-		#{
-		#If ( Test-Path "D:\Domain Event Logs\Domain Controllers" ) 
-			#{
-			# Years older than 
-			#$HowOld = [DateTime]::Now.AddYears(-2)
-			#$RecentUse = [DateTime]::Now.AddDays(-7) 
-			# Path to root folder 
-			#$Path = "D:\Domain Event Logs\Domain Controllers\*.evt" 
-			# Deletion task 
-			#get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			#}
-		
-		# Cleanup IIS log files
-		#=====================
-		#if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC1 )
-			#{
-			# Years older than 
-			#$HowOld = [DateTime]::Now.AddYears(-1)
-			#$RecentUse = [DateTime]::Now.AddDays(-90) 
-			# Path to root folder 
-			#$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log" 
-			# Deletion task 
-			#get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			#}
-
-		#if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC2 )
-			#{
-			# Years older than 
-			#$HowOld = [DateTime]::Now.AddYears(-1)
-			#$RecentUse = [DateTime]::Now.AddDays(-90) 
-			# Path to root folder 
-			#$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log" 
-			# Deletion task 
-			#get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			#}
-		#}
-
-	# Check folder size after cleanup
-	#==========================
-	if ( $PSVersionTable.PSVersion.Major -gt 4 )
-		{
-		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
-		}
-	if ( $PSVersionTable.PSVersion.Major -lt 5 )
-		{
-		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
-		}
-
-	$After = [math]::Round($AfterSize/1GB,2)
-	}	
-
- 
-	# Summary Report
-	#==================================
-	$ProfileTableOutput = $ProfileTableObject | sort -property SizeGB -desc | out-string
-	$CFolderOutput = $Cfolders | sort -property SizeGB -desc | out-string
-	$Computer = $ENV:ComputerName
-
-	$CdriveCleanupReport = @()
- 
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += $DSMessage
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += "# Server Drive audit on server $($Computer)"
-	$CdriveCleanupReport += "# Server Drive = $($DriveLetter)"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += "Before totals = $($Before) to after total = $($After)"
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += "# Software Distribution folder size"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += $SoftwareDistribution | out-string
-	$CdriveCleanupReport += ""
-
-if ($Driveletter -eq "C" )
-	{
-	$CdriveCleanupReport += "# Audit of profiles for cleanup"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += $ProfileTableOutput | out-string
-	$CdriveCleanupReport += ""
-	}
-
-	$CdriveCleanupReport += "# Audit of folder size"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += $CFolderOutput | out-string
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += "NOTE: Manual effort required:"
-	$CdriveCleanupReport += "SME/SystemOwner/SysAdmin/Server SME required to clean up drive folders"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += ""
-	}
-
-# Verify output
-$CdriveCleanupReport = $CdriveCleanupReport | out-string
-$CdriveCleanupReport
-
-
-#Check the value of $strCondition
-IF ($strCondition -eq "Good")
-{
-	$momapi.LogScriptEvent($ScriptName,$EventID,0,"NO SME/SystemOwner/SysAdmin/Server action required")
-	$bag.AddValue('Result',$strCondition)
-}
-IF ($strCondition -eq "Bad")
-{
-	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$CdriveCleanupReport")
-	$bag.AddValue('Result',$strCondition)
-	$bag.AddValue('Summary',$CdriveCleanupReport)
-}
-
-# Return all bags
-$bag
-#=================================================================================
-# End MAIN script section
-
-
-# End of script section
-#=================================================================================
-#Log an event for script ending and total execution time.
-$EndTime = Get-Date
-$ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
-#=================================================================================
-# End of script
-		  </ScriptBody>
-          <TimeoutSeconds>360</TimeoutSeconds>
-        </WriteAction>
-      </Recovery>
-      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
-        <Category>Custom</Category>
-        <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1056.ps1</ScriptName>
-          <ScriptBody>
-#=================================================================================
-#  Proactive logical disk cleanup recovery
-#
-#  Author:  Kevin Justin
-#  v1.0
-#=================================================================================
-# param([string]$DriveLetter #,[string]$ComputerName)
-#param([string]$DriveLetter)
-
-
-# Manual Testing section - put stuff here for manually testing script - typically parameters:
-#=================================================================================
-# $ComputerName = "computername.domain.com"
-$ComputerName = $env:ComputerName
-$DriveLetter = "D"
-$DriveLetter
-#=================================================================================
-
-
-# Constants section - modify stuff here:
-#=================================================================================
-# Assign script name variable for use in event logging.  
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1056.ps1"
-$EventID = "680"
-#=================================================================================
-
-
-# Starting Script section - All scripts get this
-#=================================================================================
-# Gather the start time of the script
-$StartTime = Get-Date
-#Set variable to be used in logging events
-$whoami = whoami
-# Load MOMScript API
-$momapi = New-Object -comObject MOM.ScriptAPI
-# Load PropertyBag function 
-$bag = $momapi.CreatePropertyBag()
-
-#Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
-#=================================================================================
-
-
-# Begin MAIN script section
-#=================================================================================
-#Log script parameters we received
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
-
-#For a simple example - get files in Windows Temp:
-$date = get-date -uFormat "%Y-%m-%d"
-
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather Proactive Disk Cleanup Alert report for date ($date).")
-
-$DSMessage = "Proactive Logical Disk Cleanup Alert for date ($date)."
-
-
-# Non C Drive cleanup
-#=============================
-# Debug $Driveletter
-#$Driveletter = "D"
-#$Driveletter
-if ($DriveLetter -ne "C" )
-	{
-	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
-	$CFreeSpace.DeviceID
-
- 	$DeviceDriveLetter = $CFreeSpace.DeviceID
-	$DeviceDriveLetter
-
-	# Check folder size after cleanup
-	#==========================
-	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
-	$Before = [math]::Round($BeforeSize/1GB,2)
-
-    $DiskFreeSpace = [pscustomobject]@{
-		DeviceID = $DeviceDriveLetter
-		Size = [math]::Round($CFreeSpace.Size/1GB,2)
-		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
-       }
-
-	$DiskFreeSpace
-	}
-
-
-# Check disk space (default C:)
-#======================================= 
-# Debug
-$DriveLetter
-#
-If ($DiskFreeSpace.FreeSpace -gt 15 )
-	{
-	$strCondition = "Good"
-	#$DSMessage = "NO ($DriveLetter) drive Cleanup required for date ($date)."
-	$end
-	}
- 
-If ($DiskFreeSpace.FreeSpace -lt 15 )
-	{
-	#$DriveLetter = "C:"
-	#Set the condition = bad.  This represents your script finding something wrong
-	$strCondition = "Bad"
-
-	# Proactive C: drive Cleanup
-	$resman= New-Object -ComObject "UIResource.UIResourceMgr"
-	$cacheInfo=$resman.GetCacheInfo()
-	$cacheinfo.GetCacheElements()  | foreach {$cacheInfo.DeleteCacheElement($_.CacheElementID)}
-
-
-	# get-volume
-	#=====================
-	# $DriveLetter = "C"
-	$ExpandC = get-volume
-	$ExpandAction = $ExpandC | ? { ( $_.SizeRemaining -gt "0" ) -AND ( $_.Driveletter -eq "$DriveLetter" ) }
-	
-	if ( $ExpandAction.DriveLetter -eq $true)
-		{
-		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Expand drive via Disk Manager on ($ComputerName)")
-		}
-
-
-	# Check Disk free space AFTER cleanup
-	#==================================
-	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
-	$CFreeSpace.DeviceID
- 
-	$DiskFreeSpace = [pscustomobject]@{
-		DeviceID = $CFreeSpace.DeviceID
-		Size = [math]::Round($CFreeSpace.Size/1GB,2)
-		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
-        }
- 
-	$DiskFreeSpace
- 
-	$DeviceDriveLetter = $CFreeSpace.DeviceID
-	$DeviceDriveLetter
- 
-	# Check C Drive folder size
-	#==========================
-	#$CheckCDriveFolders = (gci C:).Name | ? { ( $_ -ne "Users" ) -AND ( $_ -ne "Windows" )  }
-	$CheckCDriveFolders = (gci $DeviceDriveLetter -directory).Name | ? { ( $_ -ne "Users" ) }
-	$CheckCDriveFolders
- 
-	$Cfolders = @()
- 
-	Foreach ( $folder in $CheckCDriveFolders )
-		{
-		#$folder
-		if ( $PSVersionTable.PSVersion.Major -gt 4 )
-			{
-			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse -Depth 1 -EA SilentlyContinue | Measure-Object -Property Length -Sum ).sum
-			}
-		if ( $PSVersionTable.PSVersion.Major -lt 5 )
-			{
-			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse | Measure-Object -Property Length -Sum ).sum
-			}	
 		$Size
 
 		$CFolders += [pscustomobject]@{
@@ -3877,7 +3570,7 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 		{
 		Write-host "NO SME/SystemOwner/SysAdmin/Server Action required"
 		}
-		 
+
 	If ( $SoftwareDistribution -gt "3000" )
 		{
 		Write-host "SME/SystemOwner/SysAdmin/Server Action required, stopping Windows Update service, removing SoftwareDIstribution folder and restarting"
@@ -3885,413 +3578,6 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 		Remove-Item -Path C:\Windows\SoftwareDistribution -Recurse 
 		Get-Service -Name wuauserv | Start-Service
 		Write-host "Windows Update wuauserv service restarted after SoftwareDistribution directory removed"
-		}
-
-	# D drive Event cleanup
-	$DeviceDriveLetter
-	If ( $DeviceDriveLetter -eq "D:" )
-		{
-		If ( Test-Path "D:\Domain Event Logs\Domain Controllers" ) 
-			{
-			# Years older than 
-			$HowOld = [DateTime]::Now.AddYears(-2)
-			$RecentUse = [DateTime]::Now.AddDays(-7) 
-			# Path to root folder 
-			$Path = "D:\Domain Event Logs\Domain Controllers\*.evt" 
-			# Deletion task 
-			get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
-		
-		# Cleanup IIS log files
-		#=====================
-		if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC1 )
-			{
-			# Years older than 
-			$HowOld = [DateTime]::Now.AddYears(-1)
-			$RecentUse = [DateTime]::Now.AddDays(-90) 
-			# Path to root folder 
-			$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log" 
-			# Deletion task 
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
-
-		if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC2 )
-			{
-			# Years older than 
-			$HowOld = [DateTime]::Now.AddYears(-1)
-			$RecentUse = [DateTime]::Now.AddDays(-90) 
-			# Path to root folder 
-			$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log" 
-			# Deletion task 
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
-		}
-		
-		# Example for VEEAM backup files
-		#================================
-		If ( Test-Path "D:\Backup" )
-			{
-			# Years older than
-            $HowOld = [DateTime]::Now.AddYears(-2)
-            $RecentUse = [DateTime]::Now.AddDays(-3)
-			# Path to root folder
-            $Path = "D:\Backup\*.v*"
-			# Deletion task
-			get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld `
-				-and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
-
-		# Cleanup SQL Backup files
-		#=====================
-		# Example paths
-		# G:\Backup
-		# S:\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup
-
-		if ( Test-Path "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup )
-			{
-			# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-			# If older than 14 days 
-			$HowOld= [DateTime]::Now.AddDays(-14) 
-			$RecentUse = [DateTime]::Now.AddDays(-14) 
-			# Path to root folder 
-			$Path = "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
-			# Deletion task
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
-				-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
-
-		if ( Test-Path "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup" )
-			{
-			# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-			# If older than 14 days 
-			$HowOld= [DateTime]::Now.AddDays(-14) 
-			$RecentUse = [DateTime]::Now.AddDays(-14) 
-			# Path to root folder 
-			$Path = "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
-			# Deletion task
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
-				-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
-		
-		if ( Test-Path "G:\Backup )
-			{
-			# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-			# If older than 14 days 
-			$HowOld= [DateTime]::Now.AddDays(-14) 
-			$RecentUse = [DateTime]::Now.AddDays(-14) 
-			# Path to root folder 
-			$Path = "G:\Backup\*.bak"
-			# Deletion task
-			get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
-				-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-			}
-			
-	# Check folder size after cleanup
-	#==========================
-	if ( $PSVersionTable.PSVersion.Major -gt 4 )
-		{
-		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
-		}
-	if ( $PSVersionTable.PSVersion.Major -lt 5 )
-		{
-		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
-		}
-
-	$After = [math]::Round($AfterSize/1GB,2)
-	}	
-
- 
-	# Summary Report
-	#==================================
-	$ProfileTableOutput = $ProfileTableObject | sort -property SizeGB -desc | out-string
-	$CFolderOutput = $Cfolders | sort -property SizeGB -desc | out-string
-	$Computer = $ENV:ComputerName
-
-	$CdriveCleanupReport = @()
- 
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += $DSMessage
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += "# Server Drive audit on server $($Computer)"
-	$CdriveCleanupReport += "# Server Drive = $($DriveLetter)"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += "Before totals = $($Before) to after total = $($After)"
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += "# Software Distribution folder size"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += $SoftwareDistribution | out-string
-	$CdriveCleanupReport += ""
-
-if ($Driveletter -eq "C" )
-	{
-	$CdriveCleanupReport += "# Audit of profiles for cleanup"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += $ProfileTableOutput | out-string
-	$CdriveCleanupReport += ""
-	}
-
-	$CdriveCleanupReport += "# Audit of folder size"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += $CFolderOutput | out-string
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += "NOTE: Manual effort required:"
-	$CdriveCleanupReport += "SME/SystemOwner/SysAdmin/Server SME required to clean up drive folders"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += ""
-	}
-
-# Verify output
-$CdriveCleanupReport = $CdriveCleanupReport | out-string
-$CdriveCleanupReport
-
-
-#Check the value of $strCondition
-IF ($strCondition -eq "Good")
-{
-	$momapi.LogScriptEvent($ScriptName,$EventID,0,"NO SME/SystemOwner/SysAdmin/Server action required")
-	$bag.AddValue('Result',$strCondition)
-}
-IF ($strCondition -eq "Bad")
-{
-	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$CdriveCleanupReport")
-	$bag.AddValue('Result',$strCondition)
-	$bag.AddValue('Summary',$CdriveCleanupReport)
-}
-
-# Return all bags
-$bag
-#=================================================================================
-# End MAIN script section
-
-
-# End of script section
-#=================================================================================
-#Log an event for script ending and total execution time.
-$EndTime = Get-Date
-$ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
-#=================================================================================
-# End of script
-		  </ScriptBody>
-          <TimeoutSeconds>360</TimeoutSeconds>
-        </WriteAction>
-      </Recovery>
-      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
-        <Category>Custom</Category>
-        <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1056.ps1</ScriptName>
-          <ScriptBody>
-#=================================================================================
-#  Proactive logical disk cleanup recovery
-#
-#  Author:  Kevin Justin
-#  v1.0
-#=================================================================================
-# param([string]$DriveLetter #,[string]$ComputerName)
-#param([string]$DriveLetter)
-
-
-# Manual Testing section - put stuff here for manually testing script - typically parameters:
-#=================================================================================
-# $ComputerName = "computername.domain.com"
-$ComputerName = $env:ComputerName
-$DriveLetter = "C"
-$DriveLetter
-#=================================================================================
-
-
-# Constants section - modify stuff here:
-#=================================================================================
-# Assign script name variable for use in event logging.  
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1056.ps1"
-$EventID = "680"
-#=================================================================================
-
-
-# Starting Script section - All scripts get this
-#=================================================================================
-# Gather the start time of the script
-$StartTime = Get-Date
-#Set variable to be used in logging events
-$whoami = whoami
-# Load MOMScript API
-$momapi = New-Object -comObject MOM.ScriptAPI
-# Load PropertyBag function 
-$bag = $momapi.CreatePropertyBag()
-
-#Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
-#=================================================================================
-
-
-# Begin MAIN script section
-#=================================================================================
-#Log script parameters we received
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
-
-#For a simple example - get files in Windows Temp:
-$date = get-date -uFormat "%Y-%m-%d"
-
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather Proactive Disk Cleanup Alert report for date ($date).")
-
-$DSMessage = "Proactive Logical Disk Cleanup Alert for date ($date)."
-
-
-# Check Disk free space
-#=====================
-if ($Driveletter -eq "C" )
-	{
-	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -eq "C:" }
-	$CFreeSpace.DeviceID
-	$CFreeSpace
-	
- 	$DeviceDriveLetter = $CFreeSpace.DeviceID
-	$DeviceDriveLetter
-
-	# Check folder size after cleanup
-	#==========================
-	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
-	$Before = [math]::Round($BeforeSize/1GB,2)
-
-    $DiskFreeSpace = [pscustomobject]@{
-		DeviceID = $DeviceDriveLetter
-		Size = [math]::Round($CFreeSpace.Size/1GB,2)
-		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
-       }
- 
-	$DiskFreeSpace
- 
-	$SoftwareDistribution = (gci C:\windows\SoftwareDistribution | measure length -s).sum / 1Mb
-	# Debug
-	$SoftwareDistribution
-
-	# Check for large profile sizes
-	#==================================
-	$Profiles = Get-WmiObject -Class Win32_UserProfile |Select-Object localpath|where {(($_.localpath -notlike "*Administrator") -and ($_.localpath -notlike "C:\WINDOWS*"))}| Foreach-Object { $_.LocalPath.split(‘\’)[-1] }
-	#$Profiles=Get-WmiObject -Class Win32_UserProfile |Select-Object localpath|where {(($_.localpath -notlike "*Administrator") )}| Foreach-Object { $_.LocalPath.split(‘\’)[-1] }
-
-	# Figure out C:\Users directory size
-	$CUsersTableObject = @()
-
-	#$OS = [Environment]::OSVersion
-	$PSVersionTable.PSVersion.Major
-
-	if ( $PSVersionTable.PSVersion.Major -gt 4 )
-		{
-		$User = (gci $DriveLetter\users -Recurse -Depth 1 -EA 4 | measure length -s).sum
-		}
-	if ( $PSVersionTable.PSVersion.Major -lt 5 )
-		{
-		$User = (gci $DriveLetter\users -Recurse | measure length -s).sum
-		}
-		
-	$UserSize = [math]::Round($User/1GB,2) 
-	$CUsersTableObject += "$($UserSize) = Size of C:\Users directory"
-	$CUsersTableObject += ""
-	$CUsersTableObject
-	
-	$ProfileTableObject = @()
-	
-	# Loop through profiles
-	foreach ($Profile in $Profiles)
-		{
-		$Profile
-		#$Size = (gci $DriveLetter\users\$Profile -Recurse -Depth 1 -EA 4 | measure length -s).sum
-		if ( $PSVersionTable.PSVersion.Major -gt 4 )
-			{
-			$Size = (gci $DriveLetter\users\$Profile -Recurse -Depth 1 -EA 4 | measure length -s).sum
-			}
-		if ( $PSVersionTable.PSVersion.Major -lt 5 )
-			{
-			$Size = (gci $DriveLetter\users\$Profile -Recurse | measure length -s).sum
-			}
-
-		$ProfileTableObject += [pscustomobject]@{	
-		SizeGB = [math]::Round($Size/1GB,2)
-		#AccountID = $Profile
-		UserDirectory = "$Profile"
-	      }
-		}
-	$ProfileTableObject | sort -property SizeGB -desc
-
-	# Cleanup C:\Windows\Temp
-	#=====================
-	# May see access denied errors - Get-ChildItem
-	if ( $PSVersionTable.PSVersion.Major -gt 4 )
-		{
-		Get-ChildItem C:\Windows\Temp\ -Recurse -Depth 1 -EA 4 | Remove-Item -Recurse -Force
-		$WindowsTemp = (Get-ChildItem "C:\Windows\Temp\" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
-		}
-	if ( $PSVersionTable.PSVersion.Major -lt 5 )
-		{
-		Get-ChildItem C:\Windows\Temp\ -Recurse | Remove-Item -Recurse -Force
-		$WindowsTemp = (Get-ChildItem "C:\Windows\Temp\" -Recurse | Measure-Object -Property Length -Sum ).sum
-		}
-	}
-
-
-# Non C Drive cleanup
-#=============================
-# Debug $Driveletter
-#$Driveletter = "D"
-#$Driveletter
-if ($DriveLetter -ne "C" )
-	{
-	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
-	$CFreeSpace.DeviceID
-
- 	$DeviceDriveLetter = $CFreeSpace.DeviceID
-	$DeviceDriveLetter
-
-	# Check folder size after cleanup
-	#==========================
-	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
-	$Before = [math]::Round($BeforeSize/1GB,2)
-
-    $DiskFreeSpace = [pscustomobject]@{
-		DeviceID = $DeviceDriveLetter
-		Size = [math]::Round($CFreeSpace.Size/1GB,2)
-		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
-       }
-
-	$DiskFreeSpace
-	}
-
-
-# Check disk space (default C:)
-#======================================= 
-# Debug
-$DriveLetter
-#
-If ($DiskFreeSpace.FreeSpace -gt 5 )
-	{
-	$strCondition = "Good"
-	#$DSMessage = "NO ($DriveLetter) drive Cleanup required for date ($date)."
-	$end
-	}
- 
-If ($DiskFreeSpace.FreeSpace -lt 5 )
-	{
-	#$DriveLetter = "C:"
-	#Set the condition = bad.  This represents your script finding something wrong
-	$strCondition = "Bad"
-
-	# Proactive C: drive Cleanup
-	$resman= New-Object -ComObject "UIResource.UIResourceMgr"
-	$cacheInfo=$resman.GetCacheInfo()
-	$cacheinfo.GetCacheElements()  | foreach {$cacheInfo.DeleteCacheElement($_.CacheElementID)}
-
-
-	# get-volume
-	#=====================
-	# $DriveLetter = "C"
-	$ExpandC = get-volume
-	$ExpandAction = $ExpandC | ? { ( $_.SizeRemaining -gt "0" ) -AND ( $_.Driveletter -eq "$DriveLetter" ) }
-	
-	if ( $ExpandAction.DriveLetter -eq $true)
-		{
-		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Expand drive via Disk Manager on ($ComputerName)")
 		}
 
 	# Cleanup IIS log files
@@ -4300,7 +3586,7 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 	#	{
 	#	# Years older than 
 	#	$HowOld = [DateTime]::Now.AddYears(-1)
-	#	$RecentUse = [DateTime]::Now.AddDays(-90) 
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
 	#	# Path to root folder 
 	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC1\*.log" 
 	#	# Deletion task 
@@ -4311,403 +3597,60 @@ If ($DiskFreeSpace.FreeSpace -lt 5 )
 	#	{
 	#	# Years older than 
 	#	$HowOld = [DateTime]::Now.AddYears(-1)
-	#	$RecentUse = [DateTime]::Now.AddDays(-90) 
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
 	#	# Path to root folder 
-	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log" 
+	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log"
 	#	# Deletion task 
 	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#	}
 
-	# Check Disk free space AFTER cleanup
-	#==================================
-	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
-	$CFreeSpace.DeviceID
- 
-	$DiskFreeSpace = [pscustomobject]@{
-		DeviceID = $CFreeSpace.DeviceID
-		Size = [math]::Round($CFreeSpace.Size/1GB,2)
-		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
-        }
- 
-	$DiskFreeSpace
- 
-	$DeviceDriveLetter = $CFreeSpace.DeviceID
-	$DeviceDriveLetter
- 
-	# Check C Drive folder size
-	#==========================
-	#$CheckCDriveFolders = (gci C:).Name | ? { ( $_ -ne "Users" ) -AND ( $_ -ne "Windows" )  }
-	$CheckCDriveFolders = (gci $DeviceDriveLetter -directory).Name | ? { ( $_ -ne "Users" ) }
-	$CheckCDriveFolders
- 
-	$Cfolders = @()
- 
-	Foreach ( $folder in $CheckCDriveFolders )
-		{
-		#$folder
-		$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse -Depth 1 -EA SilentlyContinue | Measure-Object -Property Length -Sum ).sum
-		$Size
-		$CFolders += [pscustomobject]@{
-			Directory = $folder
-			SizeGB = [math]::Round($Size/1GB,2)
-			}
-		}
-	$Cfolders  #| sort -property SizeGB -desc
-
-
-# Second attempt will clean up software distribution
-#==================================
-If ($DiskFreeSpace.FreeSpace -lt 15 )
-	{
-	# Audit Software Distribution
-	#==================================
-	If ( $SoftwareDistribution -lt "3000" )
-		{
-		Write-host "NO SME/SystemOwner/SysAdmin/Server Action required"
-		}
-		 
-	If ( $SoftwareDistribution -gt "3000" )
-		{
-		Write-host "SME/SystemOwner/SysAdmin/Server Action required, stopping Windows Update service, removing SoftwareDIstribution folder and restarting"
-		Get-Service -Name wuauserv | Stop-Service 
-		Remove-Item -Path C:\Windows\SoftwareDistribution -Recurse 
-		Get-Service -Name wuauserv | Start-Service
-		Write-host "Windows Update wuauserv service restarted after SoftwareDistribution directory removed"
-		}
-
 	# D drive Event cleanup
-	$DeviceDriveLetter
+	#$DeviceDriveLetter
 	#If ( $DeviceDriveLetter -eq "D:" )
 	#	{
-	#	# Years older than 
-	#	$HowOld = [DateTime]::Now.AddYears(-2)
-	#	$RecentUse = [DateTime]::Now.AddDays(-7) 
-	#	# Path to root folder 
-	#	$Path = "D:\Domain Event Logs\Domain Controllers\*.evt" 
-	#	# Deletion task 
-	#	get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
-	#	}
-
-	# Check folder size after cleanup
-	#==========================
-	$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
-	$After = [math]::Round($AfterSize/1GB,2)
-	}	
-
- 
-	# Summary Report
-	#==================================
-	$ProfileTableOutput = $ProfileTableObject | sort -property SizeGB -desc | out-string
-	$CFolderOutput = $Cfolders | sort -property SizeGB -desc | out-string
-	$Computer = $ENV:ComputerName
-
-	$CdriveCleanupReport = @()
- 
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += $DSMessage
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += "# Server Drive audit on server $($Computer)"
-	$CdriveCleanupReport += "# Server Drive = $($DriveLetter)"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += "Before totals = $($Before) to after total = $($After)"
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += "# Software Distribution folder size"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += $SoftwareDistribution | out-string
-	$CdriveCleanupReport += ""
-
-if ($Driveletter -eq "C" )
-	{
-	$CdriveCleanupReport += "# Audit of profiles for cleanup"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += $ProfileTableOutput | out-string
-	$CdriveCleanupReport += ""
-	}
-
-	$CdriveCleanupReport += "# Audit of folder size"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += $CFolderOutput | out-string
-	$CdriveCleanupReport += ""
-	$CdriveCleanupReport += "NOTE: Manual effort required:"
-	$CdriveCleanupReport += "SME/SystemOwner/SysAdmin/Server SME required to clean up drive folders"
-	$CdriveCleanupReport += "#===================================="
-	$CdriveCleanupReport += ""
-	}
-
-# Verify output
-$CdriveCleanupReport = $CdriveCleanupReport | out-string
-$CdriveCleanupReport
-
-
-#Check the value of $strCondition
-IF ($strCondition -eq "Good")
-{
-	$momapi.LogScriptEvent($ScriptName,$EventID,0,"NO SME/SystemOwner/SysAdmin/Server action required")
-	$bag.AddValue('Result',$strCondition)
-}
-IF ($strCondition -eq "Bad")
-{
-	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$CdriveCleanupReport")
-	$bag.AddValue('Result',$strCondition)
-	$bag.AddValue('Summary',$CdriveCleanupReport)
-}
-
-# Return all bags
-$bag
-#=================================================================================
-# End MAIN script section
-
-
-# End of script section
-#=================================================================================
-#Log an event for script ending and total execution time.
-$EndTime = Get-Date
-$ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
-#=================================================================================
-# End of script
-		  </ScriptBody>
-          <TimeoutSeconds>360</TimeoutSeconds>
-        </WriteAction>
-      </Recovery>
-      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
-        <Category>Custom</Category>
-        <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1056.ps1</ScriptName>
-          <ScriptBody>
-#=================================================================================
-#  Proactive logical disk cleanup recovery
-#
-#  Author:  Kevin Justin
-#  v1.0
-#=================================================================================
-# param([string]$DriveLetter #,[string]$ComputerName)
-#param([string]$DriveLetter)
-
-
-# Manual Testing section - put stuff here for manually testing script - typically parameters:
-#=================================================================================
-# $ComputerName = "computername.domain.com"
-$ComputerName = $env:ComputerName
-$DriveLetter = "D"
-$DriveLetter
-#=================================================================================
-
-
-# Constants section - modify stuff here:
-#=================================================================================
-# Assign script name variable for use in event logging.  
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1056.ps1"
-$EventID = "680"
-#=================================================================================
-
-
-# Starting Script section - All scripts get this
-#=================================================================================
-# Gather the start time of the script
-$StartTime = Get-Date
-#Set variable to be used in logging events
-$whoami = whoami
-# Load MOMScript API
-$momapi = New-Object -comObject MOM.ScriptAPI
-# Load PropertyBag function 
-$bag = $momapi.CreatePropertyBag()
-
-#Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
-#=================================================================================
-
-
-# Begin MAIN script section
-#=================================================================================
-#Log script parameters we received
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
-
-#For a simple example - get files in Windows Temp:
-$date = get-date -uFormat "%Y-%m-%d"
-
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather Proactive Disk Cleanup Alert report for date ($date).")
-
-$DSMessage = "Proactive Logical Disk Cleanup Alert for date ($date)."
-
-
-# Non C Drive cleanup
-#=============================
-# Debug $Driveletter
-#$Driveletter = "D"
-#$Driveletter
-if ($DriveLetter -ne "C" )
-	{
-	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
-	$CFreeSpace.DeviceID
-
- 	$DeviceDriveLetter = $CFreeSpace.DeviceID
-	$DeviceDriveLetter
-
-	# Check folder size after cleanup
-	#==========================
-	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
-	$Before = [math]::Round($BeforeSize/1GB,2)
-
-    $DiskFreeSpace = [pscustomobject]@{
-		DeviceID = $DeviceDriveLetter
-		Size = [math]::Round($CFreeSpace.Size/1GB,2)
-		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
-       }
-
-	$DiskFreeSpace
-	}
-
-
-# Check disk space (default C:)
-#======================================= 
-# Debug
-$DriveLetter
-#
-If ($DiskFreeSpace.FreeSpace -gt 15 )
-	{
-	$strCondition = "Good"
-	#$DSMessage = "NO ($DriveLetter) drive Cleanup required for date ($date)."
-	$end
-	}
- 
-If ($DiskFreeSpace.FreeSpace -lt 15 )
-	{
-	#$DriveLetter = "C:"
-	#Set the condition = bad.  This represents your script finding something wrong
-	$strCondition = "Bad"
-
-	# Proactive C: drive Cleanup
-	$resman= New-Object -ComObject "UIResource.UIResourceMgr"
-	$cacheInfo=$resman.GetCacheInfo()
-	$cacheinfo.GetCacheElements()  | foreach {$cacheInfo.DeleteCacheElement($_.CacheElementID)}
-
-
-	# get-volume
-	#=====================
-	# $DriveLetter = "C"
-	$ExpandC = get-volume
-	$ExpandAction = $ExpandC | ? { ( $_.SizeRemaining -gt "0" ) -AND ( $_.Driveletter -eq "$DriveLetter" ) }
-	
-	if ( $ExpandAction.DriveLetter -eq $true)
-		{
-		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Expand drive via Disk Manager on ($ComputerName)")
-		}
-
-
-	# Check Disk free space AFTER cleanup
-	#==================================
-	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
-	$CFreeSpace.DeviceID
- 
-	$DiskFreeSpace = [pscustomobject]@{
-		DeviceID = $CFreeSpace.DeviceID
-		Size = [math]::Round($CFreeSpace.Size/1GB,2)
-		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
-        }
- 
-	$DiskFreeSpace
- 
-	$DeviceDriveLetter = $CFreeSpace.DeviceID
-	$DeviceDriveLetter
- 
-	# Check C Drive folder size
-	#==========================
-	#$CheckCDriveFolders = (gci C:).Name | ? { ( $_ -ne "Users" ) -AND ( $_ -ne "Windows" )  }
-	$CheckCDriveFolders = (gci $DeviceDriveLetter -directory).Name | ? { ( $_ -ne "Users" ) }
-	$CheckCDriveFolders
- 
-	$Cfolders = @()
- 
-	Foreach ( $folder in $CheckCDriveFolders )
-		{
-		#$folder
-		if ( $PSVersionTable.PSVersion.Major -gt 4 )
-			{
-			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse -Depth 1 -EA SilentlyContinue | Measure-Object -Property Length -Sum ).sum
-			}
-		if ( $PSVersionTable.PSVersion.Major -lt 5 )
-			{
-			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse | Measure-Object -Property Length -Sum ).sum
-			}	
-		$Size
-
-		$CFolders += [pscustomobject]@{
-			Directory = $folder
-			SizeGB = [math]::Round($Size/1GB,2)
-			}
-		}
-	$Cfolders  #| sort -property SizeGB -desc
-
-
-# Second attempt will clean up software distribution
-#==================================
-If ($DiskFreeSpace.FreeSpace -lt 15 )
-	{
-	# Audit Software Distribution
-	#==================================
-	If ( $SoftwareDistribution -lt "3000" )
-		{
-		Write-host "NO SME/SystemOwner/SysAdmin/Server Action required"
-		}
-		 
-	If ( $SoftwareDistribution -gt "3000" )
-		{
-		Write-host "SME/SystemOwner/SysAdmin/Server Action required, stopping Windows Update service, removing SoftwareDIstribution folder and restarting"
-		Get-Service -Name wuauserv | Stop-Service 
-		Remove-Item -Path C:\Windows\SoftwareDistribution -Recurse 
-		Get-Service -Name wuauserv | Start-Service
-		Write-host "Windows Update wuauserv service restarted after SoftwareDistribution directory removed"
-		}
-
-	# D drive Event cleanup
-	$DeviceDriveLetter
-	#If ( $DeviceDriveLetter -eq "D:" )
-	#	{
-	#	If ( Test-Path "D:\Domain Event Logs\Domain Controllers" ) 
+	#	If ( Test-Path "D:\Domain Event Logs\Domain Controllers" )
 	#		{
 	#		# Years older than 
 	#		$HowOld = [DateTime]::Now.AddYears(-2)
 	#		$RecentUse = [DateTime]::Now.AddDays(-7) 
 	#		# Path to root folder 
-	#		$Path = "D:\Domain Event Logs\Domain Controllers\*.evt" 
-	#		# Deletion task 
+	#		$Path = "D:\Domain Event Logs\Domain Controllers\*.evt"
+	#		# Deletion task
 	#		get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#		}
 		
-	#	# Cleanup IIS log files
-	#	#=====================
+		# Cleanup IIS log files
+		#=====================
 	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC1 )
 	#		{
-	#		# Years older than 
+	#		# Years older than
 	#		$HowOld = [DateTime]::Now.AddYears(-1)
-	#		$RecentUse = [DateTime]::Now.AddDays(-90) 
-	#		# Path to root folder 
-	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log" 
-	#		# Deletion task 
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log"
+	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#		}
 
 	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC2 )
 	#		{
-	#		# Years older than 
+	#		# Years older than
 	#		$HowOld = [DateTime]::Now.AddYears(-1)
-	#		$RecentUse = [DateTime]::Now.AddDays(-90) 
-	#		# Path to root folder 
-	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log" 
-	#		# Deletion task 
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log"
+	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#		}
 	#	}
 
-	#	# Example for VEEAM backup files
-	#	#================================
+		# Example for VEEAM backup files
+		#================================
 	#	If ( Test-Path "D:\Backup" )
 	#		{
 	#		# Years older than
     #       $HowOld = [DateTime]::Now.AddYears(-2)
-    #       $RecentUse = [DateTime]::Now.AddDays(-3)
+    #       $RecentUse = [DateTime]::Now.AddDays(-8)
 	#		# Path to root folder
     #       $Path = "D:\Backup\*.v*"
 	#		# Deletion task
@@ -4723,11 +3666,11 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 
 	#	if ( Test-Path "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup )
 	#		{
-	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-	#		# If older than 14 days 
-	#		$HowOld= [DateTime]::Now.AddDays(-14) 
-	#		$RecentUse = [DateTime]::Now.AddDays(-14) 
-	#		# Path to root folder 
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
 	#		$Path = "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
 	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
@@ -4736,24 +3679,24 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 
 	#	if ( Test-Path "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup" )
 	#		{
-	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-	#		# If older than 14 days 
-	#		$HowOld= [DateTime]::Now.AddDays(-14) 
-	#		$RecentUse = [DateTime]::Now.AddDays(-14) 
-	#		# Path to root folder 
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
 	#		$Path = "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
 	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
 	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#		}
-		
+
 	#	if ( Test-Path "G:\Backup )
 	#		{
-	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1) 
-	#		# If older than 14 days 
-	#		$HowOld= [DateTime]::Now.AddDays(-14) 
-	#		$RecentUse = [DateTime]::Now.AddDays(-14) 
-	#		# Path to root folder 
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
 	#		$Path = "G:\Backup\*.bak"
 	#		# Deletion task
 	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
@@ -4772,9 +3715,9 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 		}
 
 	$After = [math]::Round($AfterSize/1GB,2)
-	}	
+	}
 
- 
+
 	# Summary Report
 	#==================================
 	$ProfileTableOutput = $ProfileTableObject | sort -property SizeGB -desc | out-string
@@ -4822,16 +3765,16 @@ $CdriveCleanupReport
 
 #Check the value of $strCondition
 IF ($strCondition -eq "Good")
-{
+	{
 	$momapi.LogScriptEvent($ScriptName,$EventID,0,"NO SME/SystemOwner/SysAdmin/Server action required")
 	$bag.AddValue('Result',$strCondition)
-}
+	}
 IF ($strCondition -eq "Bad")
-{
+	{
 	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$CdriveCleanupReport")
 	$bag.AddValue('Result',$strCondition)
 	$bag.AddValue('Summary',$CdriveCleanupReport)
-}
+	}
 
 # Return all bags
 $bag
@@ -4844,7 +3787,1453 @@ $bag
 #Log an event for script ending and total execution time.
 $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+		  </ScriptBody>
+          <TimeoutSeconds>360</TimeoutSeconds>
+        </WriteAction>
+      </Recovery>
+      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
+        <Category>Custom</Category>
+        <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1058.ps1</ScriptName>
+          <ScriptBody>
+#=================================================================================
+#  Proactive logical disk cleanup recovery
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+# param([string]$DriveLetter #,[string]$ComputerName)
+#param([string]$DriveLetter)
+
+
+# Manual Testing section - put stuff here for manually testing script - typically parameters:
+#=================================================================================
+# $ComputerName = "computername.domain.com"
+$ComputerName = $env:ComputerName
+$DriveLetter = "D"
+$DriveLetter
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1058.ps1"
+$EventID = "680"
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#Log script parameters we received
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
+
+#For a simple example - get files in Windows Temp:
+$date = get-date -uFormat "%Y-%m-%d"
+
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather Proactive Disk Cleanup Alert report for date ($date).")
+
+$DSMessage = "Proactive Logical Disk Cleanup Alert for date ($date)."
+
+
+# Check Disk free space
+#=====================
+if ($Driveletter -eq "C" )
+	{
+	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -eq "C:" }
+	$CFreeSpace.DeviceID
+	$CFreeSpace
+
+ 	$DeviceDriveLetter = $CFreeSpace.DeviceID
+	$DeviceDriveLetter
+
+	# Check folder size after cleanup
+	#==========================
+	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
+	$Before = [math]::Round($BeforeSize/1GB,2)
+
+    $DiskFreeSpace = [pscustomobject]@{
+		DeviceID = $DeviceDriveLetter
+		Size = [math]::Round($CFreeSpace.Size/1GB,2)
+		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
+       }
+
+	$DiskFreeSpace
+
+	$SoftwareDistribution = (gci C:\windows\SoftwareDistribution | measure length -s).sum / 1Mb
+	# Debug
+	$SoftwareDistribution
+
+	# Check for large profile sizes
+	#==================================
+	$Profiles = Get-WmiObject -Class Win32_UserProfile |Select-Object localpath|where {(($_.localpath -notlike "*Administrator") -and ($_.localpath -notlike "C:\WINDOWS*"))}| Foreach-Object { $_.LocalPath.split(‘\’)[-1] }
+	#$Profiles=Get-WmiObject -Class Win32_UserProfile |Select-Object localpath|where {(($_.localpath -notlike "*Administrator") )}| Foreach-Object { $_.LocalPath.split(‘\’)[-1] }
+
+	# Figure out C:\Users directory size
+	$CUsersTableObject = @()
+
+	#$OS = [Environment]::OSVersion
+	$PSVersionTable.PSVersion.Major
+
+	if ( $PSVersionTable.PSVersion.Major -gt 4 )
+		{
+		$User = (gci $DriveLetter\users -Recurse -Depth 1 -EA 4 | measure length -s).sum
+		}
+	if ( $PSVersionTable.PSVersion.Major -lt 5 )
+		{
+		$User = (gci $DriveLetter\users -Recurse | measure length -s).sum
+		}
+
+	$UserSize = [math]::Round($User/1GB,2) 
+	$CUsersTableObject += "$($UserSize) = Size of C:\Users directory"
+	$CUsersTableObject += ""
+	$CUsersTableObject
+
+	$ProfileTableObject = @()
+
+	# Loop through profiles
+	foreach ($Profile in $Profiles)
+		{
+		$Profile
+		#$Size = (gci $DriveLetter\users\$Profile -Recurse -Depth 1 -EA 4 | measure length -s).sum
+		if ( $PSVersionTable.PSVersion.Major -gt 4 )
+			{
+			$Size = (gci $DriveLetter\users\$Profile -Recurse -Depth 1 -EA 4 | measure length -s).sum
+			}
+		if ( $PSVersionTable.PSVersion.Major -lt 5 )
+			{
+			$Size = (gci $DriveLetter\users\$Profile -Recurse | measure length -s).sum
+			}
+
+		$ProfileTableObject += [pscustomobject]@{	
+		SizeGB = [math]::Round($Size/1GB,2)
+		#AccountID = $Profile
+		UserDirectory = "$Profile"
+	      }
+		}
+	$ProfileTableObject | sort -property SizeGB -desc
+
+	# Cleanup C:\Windows\Temp
+	#=====================
+	# May see access denied errors - Get-ChildItem
+	if ( $PSVersionTable.PSVersion.Major -gt 4 )
+		{
+		Get-ChildItem C:\Windows\Temp\ -Recurse -Depth 1 -EA 4 | Remove-Item -Recurse -Force
+		$WindowsTemp = (Get-ChildItem "C:\Windows\Temp\" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
+		}
+	if ( $PSVersionTable.PSVersion.Major -lt 5 )
+		{
+		Get-ChildItem C:\Windows\Temp\ -Recurse | Remove-Item -Recurse -Force
+		$WindowsTemp = (Get-ChildItem "C:\Windows\Temp\" -Recurse | Measure-Object -Property Length -Sum ).sum
+		}
+	}
+
+
+# Non C Drive cleanup
+#=============================
+# Debug $Driveletter
+#$Driveletter = "D"
+#$Driveletter
+if ($DriveLetter -ne "C" )
+	{
+	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
+	$CFreeSpace.DeviceID
+
+ 	$DeviceDriveLetter = $CFreeSpace.DeviceID
+	$DeviceDriveLetter
+
+	# Check folder size after cleanup
+	#==========================
+	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
+	$Before = [math]::Round($BeforeSize/1GB,2)
+
+	$DeviceDriveLetter;	cd \
+    $DiskFreeSpace = [pscustomobject]@{
+		DeviceID = $DeviceDriveLetter
+		Size = [math]::Round($CFreeSpace.Size/1GB,2)
+		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
+       }
+
+	$DiskFreeSpace
+	}
+
+
+# Check disk space (default C:)
+#======================================= 
+# Debug
+$DriveLetter
+#
+If ($DiskFreeSpace.FreeSpace -gt 5 )
+	{
+	$strCondition = "Good"
+	#$DSMessage = "NO ($DriveLetter) drive Cleanup required for date ($date)."
+	$end
+	}
+ 
+If ($DiskFreeSpace.FreeSpace -lt 5 )
+	{
+	#$DriveLetter = "C:"
+	#Set the condition = bad.  This represents your script finding something wrong
+	$strCondition = "Bad"
+
+	# Proactive C: drive Cleanup
+	$resman= New-Object -ComObject "UIResource.UIResourceMgr"
+	$cacheInfo=$resman.GetCacheInfo()
+	$cacheinfo.GetCacheElements()  | foreach {$cacheInfo.DeleteCacheElement($_.CacheElementID)}
+
+
+	# get-volume
+	#=====================
+	# $DriveLetter = "C"
+	$ExpandC = get-volume
+	$ExpandAction = $ExpandC | ? { ( $_.SizeRemaining -gt "0" ) -AND ( $_.Driveletter -eq "$DriveLetter" ) }
+
+	if ( $ExpandAction.DriveLetter -eq $true)
+		{
+		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Expand drive via Disk Manager on ($ComputerName)")
+		}
+
+
+	# Check Disk free space AFTER cleanup
+	#==================================
+	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
+	$CFreeSpace.DeviceID
+
+	$DiskFreeSpace = [pscustomobject]@{
+		DeviceID = $CFreeSpace.DeviceID
+		Size = [math]::Round($CFreeSpace.Size/1GB,2)
+		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
+        }
+
+	$DiskFreeSpace
+
+	$DeviceDriveLetter = $CFreeSpace.DeviceID
+	$DeviceDriveLetter
+ 
+	# Check C Drive folder size
+	#==========================
+	#$CheckCDriveFolders = (gci C:).Name | ? { ( $_ -ne "Users" ) -AND ( $_ -ne "Windows" )  }
+	$CheckCDriveFolders = (gci $DeviceDriveLetter -directory).Name | ? { ( $_ -ne "Users" ) }
+	$CheckCDriveFolders
+
+	$Cfolders = @()
+
+	Foreach ( $folder in $CheckCDriveFolders )
+		{
+		#$folder
+		if ( $PSVersionTable.PSVersion.Major -gt 4 )
+			{
+			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse -Depth 1 -EA SilentlyContinue | Measure-Object -Property Length -Sum ).sum
+			}
+		if ( $PSVersionTable.PSVersion.Major -lt 5 )
+			{
+			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse | Measure-Object -Property Length -Sum ).sum
+			}
+		$Size
+
+		$CFolders += [pscustomobject]@{
+			Directory = $folder
+			SizeGB = [math]::Round($Size/1GB,2)
+			}
+		}
+	$Cfolders  #| sort -property SizeGB -desc
+
+
+# Second attempt will clean up software distribution
+#==================================
+If ($DiskFreeSpace.FreeSpace -lt 15 )
+	{
+	# Audit Software Distribution
+	#==================================
+	If ( $SoftwareDistribution -lt "3000" )
+		{
+		Write-host "NO SME/SystemOwner/SysAdmin/Server Action required"
+		}
+
+	If ( $SoftwareDistribution -gt "3000" )
+		{
+		Write-host "SME/SystemOwner/SysAdmin/Server Action required, stopping Windows Update service, removing SoftwareDIstribution folder and restarting"
+		Get-Service -Name wuauserv | Stop-Service 
+		Remove-Item -Path C:\Windows\SoftwareDistribution -Recurse 
+		Get-Service -Name wuauserv | Start-Service
+		Write-host "Windows Update wuauserv service restarted after SoftwareDistribution directory removed"
+		}
+
+	# Cleanup IIS log files
+	#=====================
+	#if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC1 )
+	#	{
+	#	# Years older than 
+	#	$HowOld = [DateTime]::Now.AddYears(-1)
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
+	#	# Path to root folder 
+	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC1\*.log" 
+	#	# Deletion task 
+	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#	}
+
+	#if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC2 )
+	#	{
+	#	# Years older than 
+	#	$HowOld = [DateTime]::Now.AddYears(-1)
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
+	#	# Path to root folder 
+	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log"
+	#	# Deletion task 
+	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#	}
+
+	# D drive Event cleanup
+	#$DeviceDriveLetter
+	#If ( $DeviceDriveLetter -eq "D:" )
+	#	{
+	#	If ( Test-Path "D:\Domain Event Logs\Domain Controllers" )
+	#		{
+	#		# Years older than 
+	#		$HowOld = [DateTime]::Now.AddYears(-2)
+	#		$RecentUse = [DateTime]::Now.AddDays(-7) 
+	#		# Path to root folder 
+	#		$Path = "D:\Domain Event Logs\Domain Controllers\*.evt"
+	#		# Deletion task
+	#		get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+		
+		# Cleanup IIS log files
+		#=====================
+	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC1 )
+	#		{
+	#		# Years older than
+	#		$HowOld = [DateTime]::Now.AddYears(-1)
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC2 )
+	#		{
+	#		# Years older than
+	#		$HowOld = [DateTime]::Now.AddYears(-1)
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+	#	}
+
+		# Example for VEEAM backup files
+		#================================
+	#	If ( Test-Path "D:\Backup" )
+	#		{
+	#		# Years older than
+    #       $HowOld = [DateTime]::Now.AddYears(-2)
+    #       $RecentUse = [DateTime]::Now.AddDays(-8)
+	#		# Path to root folder
+    #       $Path = "D:\Backup\*.v*"
+	#		# Deletion task
+	#		get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld `
+	#			-and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+		# Cleanup SQL Backup files
+		#=====================
+		# Example paths
+		# G:\Backup
+		# S:\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup
+
+	#	if ( Test-Path "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup )
+	#		{
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
+	#		$Path = "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	#	if ( Test-Path "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup" )
+	#		{
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
+	#		$Path = "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	#	if ( Test-Path "G:\Backup )
+	#		{
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
+	#		$Path = "G:\Backup\*.bak"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	# Check folder size after cleanup
+	#==========================
+	if ( $PSVersionTable.PSVersion.Major -gt 4 )
+		{
+		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
+		}
+	if ( $PSVersionTable.PSVersion.Major -lt 5 )
+		{
+		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
+		}
+
+	$After = [math]::Round($AfterSize/1GB,2)
+	}
+
+
+	# Summary Report
+	#==================================
+	$ProfileTableOutput = $ProfileTableObject | sort -property SizeGB -desc | out-string
+	$CFolderOutput = $Cfolders | sort -property SizeGB -desc | out-string
+	$Computer = $ENV:ComputerName
+
+	$CdriveCleanupReport = @()
+ 
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += $DSMessage
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += "# Server Drive audit on server $($Computer)"
+	$CdriveCleanupReport += "# Server Drive = $($DriveLetter)"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += "Before totals = $($Before) to after total = $($After)"
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += "# Software Distribution folder size"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += $SoftwareDistribution | out-string
+	$CdriveCleanupReport += ""
+
+if ($Driveletter -eq "C" )
+	{
+	$CdriveCleanupReport += "# Audit of profiles for cleanup"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += $ProfileTableOutput | out-string
+	$CdriveCleanupReport += ""
+	}
+
+	$CdriveCleanupReport += "# Audit of folder size"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += $CFolderOutput | out-string
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += "NOTE: Manual effort required:"
+	$CdriveCleanupReport += "SME/SystemOwner/SysAdmin/Server SME required to clean up drive folders"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += ""
+	}
+
+# Verify output
+$CdriveCleanupReport = $CdriveCleanupReport | out-string
+$CdriveCleanupReport
+
+
+#Check the value of $strCondition
+IF ($strCondition -eq "Good")
+	{
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"NO SME/SystemOwner/SysAdmin/Server action required")
+	$bag.AddValue('Result',$strCondition)
+	}
+IF ($strCondition -eq "Bad")
+	{
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$CdriveCleanupReport")
+	$bag.AddValue('Result',$strCondition)
+	$bag.AddValue('Summary',$CdriveCleanupReport)
+	}
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+		  </ScriptBody>
+          <TimeoutSeconds>360</TimeoutSeconds>
+        </WriteAction>
+      </Recovery>
+      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
+        <Category>Custom</Category>
+        <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1058.ps1</ScriptName>
+          <ScriptBody>
+#=================================================================================
+#  Proactive logical disk cleanup recovery
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+# param([string]$DriveLetter #,[string]$ComputerName)
+#param([string]$DriveLetter)
+
+
+# Manual Testing section - put stuff here for manually testing script - typically parameters:
+#=================================================================================
+# $ComputerName = "computername.domain.com"
+$ComputerName = $env:ComputerName
+$DriveLetter = "C"
+$DriveLetter
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1058.ps1"
+$EventID = "680"
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#Log script parameters we received
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
+
+#For a simple example - get files in Windows Temp:
+$date = get-date -uFormat "%Y-%m-%d"
+
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather Proactive Disk Cleanup Alert report for date ($date).")
+
+$DSMessage = "Proactive Logical Disk Cleanup Alert for date ($date)."
+
+
+# Check Disk free space
+#=====================
+if ($Driveletter -eq "C" )
+	{
+	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -eq "C:" }
+	$CFreeSpace.DeviceID
+	$CFreeSpace
+
+ 	$DeviceDriveLetter = $CFreeSpace.DeviceID
+	$DeviceDriveLetter
+
+	# Check folder size after cleanup
+	#==========================
+	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
+	$Before = [math]::Round($BeforeSize/1GB,2)
+
+    $DiskFreeSpace = [pscustomobject]@{
+		DeviceID = $DeviceDriveLetter
+		Size = [math]::Round($CFreeSpace.Size/1GB,2)
+		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
+       }
+
+	$DiskFreeSpace
+
+	$SoftwareDistribution = (gci C:\windows\SoftwareDistribution | measure length -s).sum / 1Mb
+	# Debug
+	$SoftwareDistribution
+
+	# Check for large profile sizes
+	#==================================
+	$Profiles = Get-WmiObject -Class Win32_UserProfile |Select-Object localpath|where {(($_.localpath -notlike "*Administrator") -and ($_.localpath -notlike "C:\WINDOWS*"))}| Foreach-Object { $_.LocalPath.split(‘\’)[-1] }
+	#$Profiles=Get-WmiObject -Class Win32_UserProfile |Select-Object localpath|where {(($_.localpath -notlike "*Administrator") )}| Foreach-Object { $_.LocalPath.split(‘\’)[-1] }
+
+	# Figure out C:\Users directory size
+	$CUsersTableObject = @()
+
+	#$OS = [Environment]::OSVersion
+	$PSVersionTable.PSVersion.Major
+
+	if ( $PSVersionTable.PSVersion.Major -gt 4 )
+		{
+		$User = (gci $DriveLetter\users -Recurse -Depth 1 -EA 4 | measure length -s).sum
+		}
+	if ( $PSVersionTable.PSVersion.Major -lt 5 )
+		{
+		$User = (gci $DriveLetter\users -Recurse | measure length -s).sum
+		}
+
+	$UserSize = [math]::Round($User/1GB,2) 
+	$CUsersTableObject += "$($UserSize) = Size of C:\Users directory"
+	$CUsersTableObject += ""
+	$CUsersTableObject
+
+	$ProfileTableObject = @()
+
+	# Loop through profiles
+	foreach ($Profile in $Profiles)
+		{
+		$Profile
+		#$Size = (gci $DriveLetter\users\$Profile -Recurse -Depth 1 -EA 4 | measure length -s).sum
+		if ( $PSVersionTable.PSVersion.Major -gt 4 )
+			{
+			$Size = (gci $DriveLetter\users\$Profile -Recurse -Depth 1 -EA 4 | measure length -s).sum
+			}
+		if ( $PSVersionTable.PSVersion.Major -lt 5 )
+			{
+			$Size = (gci $DriveLetter\users\$Profile -Recurse | measure length -s).sum
+			}
+
+		$ProfileTableObject += [pscustomobject]@{	
+		SizeGB = [math]::Round($Size/1GB,2)
+		#AccountID = $Profile
+		UserDirectory = "$Profile"
+	      }
+		}
+	$ProfileTableObject | sort -property SizeGB -desc
+
+	# Cleanup C:\Windows\Temp
+	#=====================
+	# May see access denied errors - Get-ChildItem
+	if ( $PSVersionTable.PSVersion.Major -gt 4 )
+		{
+		Get-ChildItem C:\Windows\Temp\ -Recurse -Depth 1 -EA 4 | Remove-Item -Recurse -Force
+		$WindowsTemp = (Get-ChildItem "C:\Windows\Temp\" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
+		}
+	if ( $PSVersionTable.PSVersion.Major -lt 5 )
+		{
+		Get-ChildItem C:\Windows\Temp\ -Recurse | Remove-Item -Recurse -Force
+		$WindowsTemp = (Get-ChildItem "C:\Windows\Temp\" -Recurse | Measure-Object -Property Length -Sum ).sum
+		}
+	}
+
+
+# Non C Drive cleanup
+#=============================
+# Debug $Driveletter
+#$Driveletter = "D"
+#$Driveletter
+if ($DriveLetter -ne "C" )
+	{
+	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
+	$CFreeSpace.DeviceID
+
+ 	$DeviceDriveLetter = $CFreeSpace.DeviceID
+	$DeviceDriveLetter
+
+	# Check folder size after cleanup
+	#==========================
+	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
+	$Before = [math]::Round($BeforeSize/1GB,2)
+
+	$DeviceDriveLetter;	cd \
+    $DiskFreeSpace = [pscustomobject]@{
+		DeviceID = $DeviceDriveLetter
+		Size = [math]::Round($CFreeSpace.Size/1GB,2)
+		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
+       }
+
+	$DiskFreeSpace
+	}
+
+
+# Check disk space (default C:)
+#======================================= 
+# Debug
+$DriveLetter
+#
+If ($DiskFreeSpace.FreeSpace -gt 5 )
+	{
+	$strCondition = "Good"
+	#$DSMessage = "NO ($DriveLetter) drive Cleanup required for date ($date)."
+	$end
+	}
+ 
+If ($DiskFreeSpace.FreeSpace -lt 5 )
+	{
+	#$DriveLetter = "C:"
+	#Set the condition = bad.  This represents your script finding something wrong
+	$strCondition = "Bad"
+
+	# Proactive C: drive Cleanup
+	$resman= New-Object -ComObject "UIResource.UIResourceMgr"
+	$cacheInfo=$resman.GetCacheInfo()
+	$cacheinfo.GetCacheElements()  | foreach {$cacheInfo.DeleteCacheElement($_.CacheElementID)}
+
+
+	# get-volume
+	#=====================
+	# $DriveLetter = "C"
+	$ExpandC = get-volume
+	$ExpandAction = $ExpandC | ? { ( $_.SizeRemaining -gt "0" ) -AND ( $_.Driveletter -eq "$DriveLetter" ) }
+
+	if ( $ExpandAction.DriveLetter -eq $true)
+		{
+		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Expand drive via Disk Manager on ($ComputerName)")
+		}
+
+
+	# Check Disk free space AFTER cleanup
+	#==================================
+	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
+	$CFreeSpace.DeviceID
+
+	$DiskFreeSpace = [pscustomobject]@{
+		DeviceID = $CFreeSpace.DeviceID
+		Size = [math]::Round($CFreeSpace.Size/1GB,2)
+		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
+        }
+
+	$DiskFreeSpace
+
+	$DeviceDriveLetter = $CFreeSpace.DeviceID
+	$DeviceDriveLetter
+ 
+	# Check C Drive folder size
+	#==========================
+	#$CheckCDriveFolders = (gci C:).Name | ? { ( $_ -ne "Users" ) -AND ( $_ -ne "Windows" )  }
+	$CheckCDriveFolders = (gci $DeviceDriveLetter -directory).Name | ? { ( $_ -ne "Users" ) }
+	$CheckCDriveFolders
+
+	$Cfolders = @()
+
+	Foreach ( $folder in $CheckCDriveFolders )
+		{
+		#$folder
+		if ( $PSVersionTable.PSVersion.Major -gt 4 )
+			{
+			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse -Depth 1 -EA SilentlyContinue | Measure-Object -Property Length -Sum ).sum
+			}
+		if ( $PSVersionTable.PSVersion.Major -lt 5 )
+			{
+			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse | Measure-Object -Property Length -Sum ).sum
+			}
+		$Size
+
+		$CFolders += [pscustomobject]@{
+			Directory = $folder
+			SizeGB = [math]::Round($Size/1GB,2)
+			}
+		}
+	$Cfolders  #| sort -property SizeGB -desc
+
+
+# Second attempt will clean up software distribution
+#==================================
+If ($DiskFreeSpace.FreeSpace -lt 15 )
+	{
+	# Audit Software Distribution
+	#==================================
+	If ( $SoftwareDistribution -lt "3000" )
+		{
+		Write-host "NO SME/SystemOwner/SysAdmin/Server Action required"
+		}
+
+	If ( $SoftwareDistribution -gt "3000" )
+		{
+		Write-host "SME/SystemOwner/SysAdmin/Server Action required, stopping Windows Update service, removing SoftwareDIstribution folder and restarting"
+		Get-Service -Name wuauserv | Stop-Service 
+		Remove-Item -Path C:\Windows\SoftwareDistribution -Recurse 
+		Get-Service -Name wuauserv | Start-Service
+		Write-host "Windows Update wuauserv service restarted after SoftwareDistribution directory removed"
+		}
+
+	# Cleanup IIS log files
+	#=====================
+	#if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC1 )
+	#	{
+	#	# Years older than 
+	#	$HowOld = [DateTime]::Now.AddYears(-1)
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
+	#	# Path to root folder 
+	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC1\*.log" 
+	#	# Deletion task 
+	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#	}
+
+	#if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC2 )
+	#	{
+	#	# Years older than 
+	#	$HowOld = [DateTime]::Now.AddYears(-1)
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
+	#	# Path to root folder 
+	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log"
+	#	# Deletion task 
+	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#	}
+
+	# D drive Event cleanup
+	#$DeviceDriveLetter
+	#If ( $DeviceDriveLetter -eq "D:" )
+	#	{
+	#	If ( Test-Path "D:\Domain Event Logs\Domain Controllers" )
+	#		{
+	#		# Years older than 
+	#		$HowOld = [DateTime]::Now.AddYears(-2)
+	#		$RecentUse = [DateTime]::Now.AddDays(-7) 
+	#		# Path to root folder 
+	#		$Path = "D:\Domain Event Logs\Domain Controllers\*.evt"
+	#		# Deletion task
+	#		get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+		
+		# Cleanup IIS log files
+		#=====================
+	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC1 )
+	#		{
+	#		# Years older than
+	#		$HowOld = [DateTime]::Now.AddYears(-1)
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC2 )
+	#		{
+	#		# Years older than
+	#		$HowOld = [DateTime]::Now.AddYears(-1)
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+	#	}
+
+		# Example for VEEAM backup files
+		#================================
+	#	If ( Test-Path "D:\Backup" )
+	#		{
+	#		# Years older than
+    #       $HowOld = [DateTime]::Now.AddYears(-2)
+    #       $RecentUse = [DateTime]::Now.AddDays(-8)
+	#		# Path to root folder
+    #       $Path = "D:\Backup\*.v*"
+	#		# Deletion task
+	#		get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld `
+	#			-and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+		# Cleanup SQL Backup files
+		#=====================
+		# Example paths
+		# G:\Backup
+		# S:\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup
+
+	#	if ( Test-Path "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup )
+	#		{
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
+	#		$Path = "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	#	if ( Test-Path "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup" )
+	#		{
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
+	#		$Path = "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	#	if ( Test-Path "G:\Backup )
+	#		{
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
+	#		$Path = "G:\Backup\*.bak"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	# Check folder size after cleanup
+	#==========================
+	if ( $PSVersionTable.PSVersion.Major -gt 4 )
+		{
+		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
+		}
+	if ( $PSVersionTable.PSVersion.Major -lt 5 )
+		{
+		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
+		}
+
+	$After = [math]::Round($AfterSize/1GB,2)
+	}
+
+
+	# Summary Report
+	#==================================
+	$ProfileTableOutput = $ProfileTableObject | sort -property SizeGB -desc | out-string
+	$CFolderOutput = $Cfolders | sort -property SizeGB -desc | out-string
+	$Computer = $ENV:ComputerName
+
+	$CdriveCleanupReport = @()
+ 
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += $DSMessage
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += "# Server Drive audit on server $($Computer)"
+	$CdriveCleanupReport += "# Server Drive = $($DriveLetter)"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += "Before totals = $($Before) to after total = $($After)"
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += "# Software Distribution folder size"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += $SoftwareDistribution | out-string
+	$CdriveCleanupReport += ""
+
+if ($Driveletter -eq "C" )
+	{
+	$CdriveCleanupReport += "# Audit of profiles for cleanup"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += $ProfileTableOutput | out-string
+	$CdriveCleanupReport += ""
+	}
+
+	$CdriveCleanupReport += "# Audit of folder size"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += $CFolderOutput | out-string
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += "NOTE: Manual effort required:"
+	$CdriveCleanupReport += "SME/SystemOwner/SysAdmin/Server SME required to clean up drive folders"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += ""
+	}
+
+# Verify output
+$CdriveCleanupReport = $CdriveCleanupReport | out-string
+$CdriveCleanupReport
+
+
+#Check the value of $strCondition
+IF ($strCondition -eq "Good")
+	{
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"NO SME/SystemOwner/SysAdmin/Server action required")
+	$bag.AddValue('Result',$strCondition)
+	}
+IF ($strCondition -eq "Bad")
+	{
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$CdriveCleanupReport")
+	$bag.AddValue('Result',$strCondition)
+	$bag.AddValue('Summary',$CdriveCleanupReport)
+	}
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+		  </ScriptBody>
+          <TimeoutSeconds>360</TimeoutSeconds>
+        </WriteAction>
+      </Recovery>
+      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
+        <Category>Custom</Category>
+        <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1058.ps1</ScriptName>
+          <ScriptBody>
+#=================================================================================
+#  Proactive logical disk cleanup recovery
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+# param([string]$DriveLetter #,[string]$ComputerName)
+#param([string]$DriveLetter)
+
+
+# Manual Testing section - put stuff here for manually testing script - typically parameters:
+#=================================================================================
+# $ComputerName = "computername.domain.com"
+$ComputerName = $env:ComputerName
+$DriveLetter = "D"
+$DriveLetter
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1058.ps1"
+$EventID = "680"
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#Log script parameters we received
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
+
+#For a simple example - get files in Windows Temp:
+$date = get-date -uFormat "%Y-%m-%d"
+
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather Proactive Disk Cleanup Alert report for date ($date).")
+
+$DSMessage = "Proactive Logical Disk Cleanup Alert for date ($date)."
+
+
+# Check Disk free space
+#=====================
+if ($Driveletter -eq "C" )
+	{
+	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -eq "C:" }
+	$CFreeSpace.DeviceID
+	$CFreeSpace
+
+ 	$DeviceDriveLetter = $CFreeSpace.DeviceID
+	$DeviceDriveLetter
+
+	# Check folder size after cleanup
+	#==========================
+	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
+	$Before = [math]::Round($BeforeSize/1GB,2)
+
+    $DiskFreeSpace = [pscustomobject]@{
+		DeviceID = $DeviceDriveLetter
+		Size = [math]::Round($CFreeSpace.Size/1GB,2)
+		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
+       }
+
+	$DiskFreeSpace
+
+	$SoftwareDistribution = (gci C:\windows\SoftwareDistribution | measure length -s).sum / 1Mb
+	# Debug
+	$SoftwareDistribution
+
+	# Check for large profile sizes
+	#==================================
+	$Profiles = Get-WmiObject -Class Win32_UserProfile |Select-Object localpath|where {(($_.localpath -notlike "*Administrator") -and ($_.localpath -notlike "C:\WINDOWS*"))}| Foreach-Object { $_.LocalPath.split(‘\’)[-1] }
+	#$Profiles=Get-WmiObject -Class Win32_UserProfile |Select-Object localpath|where {(($_.localpath -notlike "*Administrator") )}| Foreach-Object { $_.LocalPath.split(‘\’)[-1] }
+
+	# Figure out C:\Users directory size
+	$CUsersTableObject = @()
+
+	#$OS = [Environment]::OSVersion
+	$PSVersionTable.PSVersion.Major
+
+	if ( $PSVersionTable.PSVersion.Major -gt 4 )
+		{
+		$User = (gci $DriveLetter\users -Recurse -Depth 1 -EA 4 | measure length -s).sum
+		}
+	if ( $PSVersionTable.PSVersion.Major -lt 5 )
+		{
+		$User = (gci $DriveLetter\users -Recurse | measure length -s).sum
+		}
+
+	$UserSize = [math]::Round($User/1GB,2) 
+	$CUsersTableObject += "$($UserSize) = Size of C:\Users directory"
+	$CUsersTableObject += ""
+	$CUsersTableObject
+
+	$ProfileTableObject = @()
+
+	# Loop through profiles
+	foreach ($Profile in $Profiles)
+		{
+		$Profile
+		#$Size = (gci $DriveLetter\users\$Profile -Recurse -Depth 1 -EA 4 | measure length -s).sum
+		if ( $PSVersionTable.PSVersion.Major -gt 4 )
+			{
+			$Size = (gci $DriveLetter\users\$Profile -Recurse -Depth 1 -EA 4 | measure length -s).sum
+			}
+		if ( $PSVersionTable.PSVersion.Major -lt 5 )
+			{
+			$Size = (gci $DriveLetter\users\$Profile -Recurse | measure length -s).sum
+			}
+
+		$ProfileTableObject += [pscustomobject]@{	
+		SizeGB = [math]::Round($Size/1GB,2)
+		#AccountID = $Profile
+		UserDirectory = "$Profile"
+	      }
+		}
+	$ProfileTableObject | sort -property SizeGB -desc
+
+	# Cleanup C:\Windows\Temp
+	#=====================
+	# May see access denied errors - Get-ChildItem
+	if ( $PSVersionTable.PSVersion.Major -gt 4 )
+		{
+		Get-ChildItem C:\Windows\Temp\ -Recurse -Depth 1 -EA 4 | Remove-Item -Recurse -Force
+		$WindowsTemp = (Get-ChildItem "C:\Windows\Temp\" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
+		}
+	if ( $PSVersionTable.PSVersion.Major -lt 5 )
+		{
+		Get-ChildItem C:\Windows\Temp\ -Recurse | Remove-Item -Recurse -Force
+		$WindowsTemp = (Get-ChildItem "C:\Windows\Temp\" -Recurse | Measure-Object -Property Length -Sum ).sum
+		}
+	}
+
+
+# Non C Drive cleanup
+#=============================
+# Debug $Driveletter
+#$Driveletter = "D"
+#$Driveletter
+if ($DriveLetter -ne "C" )
+	{
+	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
+	$CFreeSpace.DeviceID
+
+ 	$DeviceDriveLetter = $CFreeSpace.DeviceID
+	$DeviceDriveLetter
+
+	# Check folder size after cleanup
+	#==========================
+	$BeforeSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
+	$Before = [math]::Round($BeforeSize/1GB,2)
+
+	$DeviceDriveLetter;	cd \
+    $DiskFreeSpace = [pscustomobject]@{
+		DeviceID = $DeviceDriveLetter
+		Size = [math]::Round($CFreeSpace.Size/1GB,2)
+		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
+       }
+
+	$DiskFreeSpace
+	}
+
+
+# Check disk space (default C:)
+#======================================= 
+# Debug
+$DriveLetter
+#
+If ($DiskFreeSpace.FreeSpace -gt 5 )
+	{
+	$strCondition = "Good"
+	#$DSMessage = "NO ($DriveLetter) drive Cleanup required for date ($date)."
+	$end
+	}
+ 
+If ($DiskFreeSpace.FreeSpace -lt 5 )
+	{
+	#$DriveLetter = "C:"
+	#Set the condition = bad.  This represents your script finding something wrong
+	$strCondition = "Bad"
+
+	# Proactive C: drive Cleanup
+	$resman= New-Object -ComObject "UIResource.UIResourceMgr"
+	$cacheInfo=$resman.GetCacheInfo()
+	$cacheinfo.GetCacheElements()  | foreach {$cacheInfo.DeleteCacheElement($_.CacheElementID)}
+
+
+	# get-volume
+	#=====================
+	# $DriveLetter = "C"
+	$ExpandC = get-volume
+	$ExpandAction = $ExpandC | ? { ( $_.SizeRemaining -gt "0" ) -AND ( $_.Driveletter -eq "$DriveLetter" ) }
+
+	if ( $ExpandAction.DriveLetter -eq $true)
+		{
+		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Expand drive via Disk Manager on ($ComputerName)")
+		}
+
+
+	# Check Disk free space AFTER cleanup
+	#==================================
+	$CFreeSpace = gwmi win32_logicaldisk | ? { $_.DeviceID -like "$DriveLetter*" }
+	$CFreeSpace.DeviceID
+
+	$DiskFreeSpace = [pscustomobject]@{
+		DeviceID = $CFreeSpace.DeviceID
+		Size = [math]::Round($CFreeSpace.Size/1GB,2)
+		FreeSpace = [math]::Round($CFreeSpace.FreeSpace/1GB,2)
+        }
+
+	$DiskFreeSpace
+
+	$DeviceDriveLetter = $CFreeSpace.DeviceID
+	$DeviceDriveLetter
+ 
+	# Check C Drive folder size
+	#==========================
+	#$CheckCDriveFolders = (gci C:).Name | ? { ( $_ -ne "Users" ) -AND ( $_ -ne "Windows" )  }
+	$CheckCDriveFolders = (gci $DeviceDriveLetter -directory).Name | ? { ( $_ -ne "Users" ) }
+	$CheckCDriveFolders
+
+	$Cfolders = @()
+
+	Foreach ( $folder in $CheckCDriveFolders )
+		{
+		#$folder
+		if ( $PSVersionTable.PSVersion.Major -gt 4 )
+			{
+			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse -Depth 1 -EA SilentlyContinue | Measure-Object -Property Length -Sum ).sum
+			}
+		if ( $PSVersionTable.PSVersion.Major -lt 5 )
+			{
+			$Size = (Get-ChildItem "$DeviceDriveLetter\$folder" -Force -Recurse | Measure-Object -Property Length -Sum ).sum
+			}
+		$Size
+
+		$CFolders += [pscustomobject]@{
+			Directory = $folder
+			SizeGB = [math]::Round($Size/1GB,2)
+			}
+		}
+	$Cfolders  #| sort -property SizeGB -desc
+
+
+# Second attempt will clean up software distribution
+#==================================
+If ($DiskFreeSpace.FreeSpace -lt 15 )
+	{
+	# Audit Software Distribution
+	#==================================
+	If ( $SoftwareDistribution -lt "3000" )
+		{
+		Write-host "NO SME/SystemOwner/SysAdmin/Server Action required"
+		}
+
+	If ( $SoftwareDistribution -gt "3000" )
+		{
+		Write-host "SME/SystemOwner/SysAdmin/Server Action required, stopping Windows Update service, removing SoftwareDIstribution folder and restarting"
+		Get-Service -Name wuauserv | Stop-Service 
+		Remove-Item -Path C:\Windows\SoftwareDistribution -Recurse 
+		Get-Service -Name wuauserv | Start-Service
+		Write-host "Windows Update wuauserv service restarted after SoftwareDistribution directory removed"
+		}
+
+	# Cleanup IIS log files
+	#=====================
+	#if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC1 )
+	#	{
+	#	# Years older than 
+	#	$HowOld = [DateTime]::Now.AddYears(-1)
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
+	#	# Path to root folder 
+	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC1\*.log" 
+	#	# Deletion task 
+	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#	}
+
+	#if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC2 )
+	#	{
+	#	# Years older than 
+	#	$HowOld = [DateTime]::Now.AddYears(-1)
+	#	$RecentUse = [DateTime]::Now.AddDays(-90)
+	#	# Path to root folder 
+	#	$Path = "C:\inetpub\logs\LogFiles\W3SVC2\*.log"
+	#	# Deletion task 
+	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#	}
+
+	# D drive Event cleanup
+	#$DeviceDriveLetter
+	#If ( $DeviceDriveLetter -eq "D:" )
+	#	{
+	#	If ( Test-Path "D:\Domain Event Logs\Domain Controllers" )
+	#		{
+	#		# Years older than 
+	#		$HowOld = [DateTime]::Now.AddYears(-2)
+	#		$RecentUse = [DateTime]::Now.AddDays(-7) 
+	#		# Path to root folder 
+	#		$Path = "D:\Domain Event Logs\Domain Controllers\*.evt"
+	#		# Deletion task
+	#		get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+		
+		# Cleanup IIS log files
+		#=====================
+	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC1 )
+	#		{
+	#		# Years older than
+	#		$HowOld = [DateTime]::Now.AddYears(-1)
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC1\*.log"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	#	if ( Test-Path D:\inetpub\logs\LogFiles\W3SVC2 )
+	#		{
+	#		# Years older than
+	#		$HowOld = [DateTime]::Now.AddYears(-1)
+	#		$RecentUse = [DateTime]::Now.AddDays(-90)
+	#		# Path to root folder
+	#		$Path = "D:\inetpub\logs\LogFiles\W3SVC2\*.log"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+	#	}
+
+		# Example for VEEAM backup files
+		#================================
+	#	If ( Test-Path "D:\Backup" )
+	#		{
+	#		# Years older than
+    #       $HowOld = [DateTime]::Now.AddYears(-2)
+    #       $RecentUse = [DateTime]::Now.AddDays(-8)
+	#		# Path to root folder
+    #       $Path = "D:\Backup\*.v*"
+	#		# Deletion task
+	#		get-childitem $Path -recurse | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld `
+	#			-and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+		# Cleanup SQL Backup files
+		#=====================
+		# Example paths
+		# G:\Backup
+		# S:\Microsoft SQL Server\MSSQL13.MSSQLSERVER\MSSQL\Backup
+
+	#	if ( Test-Path "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup )
+	#		{
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
+	#		$Path = "S:\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	#	if ( Test-Path "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup" )
+	#		{
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
+	#		$Path = "Z:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Backup\*.bak"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	#	if ( Test-Path "G:\Backup )
+	#		{
+	#		# Years older than #$HowOld = [DateTime]::Now.AddYears(-1)
+	#		# If older than 14 days
+	#		$HowOld= [DateTime]::Now.AddDays(-14)
+	#		$RecentUse = [DateTime]::Now.AddDays(-14)
+	#		# Path to root folder
+	#		$Path = "G:\Backup\*.bak"
+	#		# Deletion task
+	#		get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse `
+	#			-and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
+	#		}
+
+	# Check folder size after cleanup
+	#==========================
+	if ( $PSVersionTable.PSVersion.Major -gt 4 )
+		{
+		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse -Depth 1 -EA 4 | Measure-Object -Property Length -Sum ).sum
+		}
+	if ( $PSVersionTable.PSVersion.Major -lt 5 )
+		{
+		$AfterSize = (Get-ChildItem "$DeviceDriveLetter" -Recurse | Measure-Object -Property Length -Sum ).sum
+		}
+
+	$After = [math]::Round($AfterSize/1GB,2)
+	}
+
+
+	# Summary Report
+	#==================================
+	$ProfileTableOutput = $ProfileTableObject | sort -property SizeGB -desc | out-string
+	$CFolderOutput = $Cfolders | sort -property SizeGB -desc | out-string
+	$Computer = $ENV:ComputerName
+
+	$CdriveCleanupReport = @()
+ 
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += $DSMessage
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += "# Server Drive audit on server $($Computer)"
+	$CdriveCleanupReport += "# Server Drive = $($DriveLetter)"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += "Before totals = $($Before) to after total = $($After)"
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += "# Software Distribution folder size"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += $SoftwareDistribution | out-string
+	$CdriveCleanupReport += ""
+
+if ($Driveletter -eq "C" )
+	{
+	$CdriveCleanupReport += "# Audit of profiles for cleanup"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += $ProfileTableOutput | out-string
+	$CdriveCleanupReport += ""
+	}
+
+	$CdriveCleanupReport += "# Audit of folder size"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += $CFolderOutput | out-string
+	$CdriveCleanupReport += ""
+	$CdriveCleanupReport += "NOTE: Manual effort required:"
+	$CdriveCleanupReport += "SME/SystemOwner/SysAdmin/Server SME required to clean up drive folders"
+	$CdriveCleanupReport += "#===================================="
+	$CdriveCleanupReport += ""
+	}
+
+# Verify output
+$CdriveCleanupReport = $CdriveCleanupReport | out-string
+$CdriveCleanupReport
+
+
+#Check the value of $strCondition
+IF ($strCondition -eq "Good")
+	{
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"NO SME/SystemOwner/SysAdmin/Server action required")
+	$bag.AddValue('Result',$strCondition)
+	}
+IF ($strCondition -eq "Bad")
+	{
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$CdriveCleanupReport")
+	$bag.AddValue('Result',$strCondition)
+	$bag.AddValue('Summary',$CdriveCleanupReport)
+	}
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 #=================================================================================
 # End of script
 		  </ScriptBody>
@@ -4854,7 +5243,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
       <Recovery ID="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.Computer" Monitor="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="300">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1056.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1058.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive Group Policy System Event ID 1096 recovery
@@ -4873,8 +5262,8 @@ $ComputerName = $env:ComputerName
 
 # Constants section - modify stuff here:
 #=================================================================================
-# Assign script name variable for use in event logging.  
-$ScriptName = "Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1056.ps1"
+# Assign script name variable for use in event logging.
+$ScriptName = "Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1058.ps1"
 $EventID = "680"
 #=================================================================================
 
@@ -4891,7 +5280,7 @@ $momapi = New-Object -comObject MOM.ScriptAPI
 $bag = $momapi.CreatePropertyBag()
 
 #Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script is starting. `n Running as ($whoami).")
 #=================================================================================
 
 
@@ -4904,7 +5293,7 @@ $date = get-date -uFormat "%Y-%m-%d"
 $Time = [DateTime](Get-Date).AddHours(-1)
 $FourHours = [DateTime](Get-Date).AddHours(-4)
 
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather Proactive Group Policy EventID 1096 report for date ($date).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather Proactive Group Policy EventID 1096 report for date ($date).")
 
 $DSMessage = "Proactive Group Policy EventID 1096 Alert report for date ($date)."
 
@@ -4987,144 +5376,8 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
         </WriteAction>
       </Recovery>
       <Recovery ID="Microsoft.Windows.Server.2016.Eventlog.Service.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" Monitor="MWS6M!Microsoft.Windows.Server.10.0.OperatingSystem.EventLogServiceHealth" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="300">
-        <Category>Custom</Category>
-        <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1056.ps1</ScriptName>
-          <ScriptBody>
-#=================================================================================
-#  Script to restart a service
-#
-#  Author:  Kevin Holman
-#
-#  Version:  1.0
-#
-#=================================================================================
-
-
-# Manual Testing section - put stuff here for manually testing script - typically parameters:
-#=================================================================================
-# $ServiceName = "Eventlog"
-#=================================================================================
-
-
-# Constants section - modify stuff here:
-#=================================================================================
-# Assign script name variable for use in event logging
-$ScriptName = "Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1056.ps1"
-$EventID = "3750"
-#=================================================================================
-
-
-# Starting Script section
-#=================================================================================
-# Gather the start time of the script
-$StartTime = Get-Date
-#Set variable to be used in logging events
-$whoami = whoami
-# Load MOMScript API
-$momapi = New-Object -comObject MOM.ScriptAPI
-#=================================================================================
-
-
-# Begin MAIN script section
-#=================================================================================
-
-[string]$ServiceName = "Eventlog"
-
-#Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Recovery script for service: ($ServiceName) is starting. `n Running as ($whoami).")
-write-host "Recovery script for service: ($ServiceName) is starting. Running as ($whoami)."
-
-#Get the service object
-$Svc = Get-Service $ServiceName
-
-#Check to ensure the service exists:
-IF (!$Svc)
-{
-  $momapi.LogScriptEvent($ScriptName,3751,2, "`n Service ($ServiceName) was not found on this computer. `n This indicates a misconfiguration of the monitor. `n Error is ($error)")
-  write-host "Service ($ServiceName) was not found on this computer. This indicates a misconfiguration of the monitor. Error is ($error)"
-  EXIT
-}
-
-#Get Service Status:
-[string]$SvcStatus = $Svc.Status
-
-#Do not continue is service is already running
-IF ($SvcStatus -eq "Running")
-{
-  $momapi.LogScriptEvent($ScriptName,3752,2, "`n Service ($ServiceName) was found to be in the Running state. `n This indicates a misconfiguration of the monitor. `n No recovery action will be taken.")
-  write-host "Service ($ServiceName) was found to be in the Running state. This indicates a misconfiguration of the monitor. No recovery action will be taken."
-  EXIT  
-}
-
-#Log recovery information event
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) was found to be in the ($SvcStatus) state.  Recovery will be attempted.")
-write-host "Service: ($ServiceName) was found to be in the ($SvcStatus) state.  Recovery will be attempted."
-
-#Attempt First Recovery
-Restart-Service -Name $ServiceName -Force
-#Wait time in seconds
-Start-Sleep 20
-#Get the service object
-$Svc = Get-Service $ServiceName
-#Get Service Status:
-$SvcStatus = $Svc.Status
-
-IF ($SvcStatus -ne "Running")
-{
-  #Attempt Second Recovery
-  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) second attempt at recovering starting now.")
-  write-host "Service: ($ServiceName) second attempt at recovering starting now."  
-  Restart-Service -Name $ServiceName -Force
-  Start-Sleep 20
-  $Svc = Get-Service $ServiceName
-  $SvcStatus = $Svc.Status 
-}
-
-IF ($SvcStatus -ne "Running")
-{
-  #Attempt Third Recovery
-  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) third attempt at recovering starting now.")
-  write-host "Service: ($ServiceName) third attempt at recovering starting now."    
-  Restart-Service -Name $ServiceName -Force
-  Start-Sleep 20
-  $Svc = Get-Service $ServiceName
-  $SvcStatus = $Svc.Status 
-}
-
-IF ($SvcStatus -eq "Running")
-{
-  #Log event of a successful restart
-  $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Service: ($ServiceName) was successfully restarted and then detected to be in the Running state.")
-  write-host "Service: ($ServiceName) was successfully restarted and then detected to be in the Running state."
-}
-ELSE
-{
-  #Log event of a successful restart
-  $momapi.LogScriptEvent($ScriptName,3753,2,"`n Service: ($ServiceName) is not running. `n Recovery was attempted and failed. `n Manual interventon is required. `n The last detected service status was ($SvcStatus).") 
-  write-host "Service: ($ServiceName) is not running. Recovery was attempted and failed. Manual interventon is required. The last detected service status was ($SvcStatus)."
-}
-
-# Check to see if this recovery script has been run multiple times in the last x minutes for detection of too many recovery actions
-$Message = "*($ServiceName) is starting*"
-$Events = Get-EventLog -LogName 'Operations Manager' -After $StartTime.AddMinutes(-60) -Message $Message | where {$_.EventID -eq 3750}
-$EventCount = $Events.Count
-IF ($EventCount -ge 3)
-{
-  $momapi.LogScriptEvent($ScriptName,3754,2,"`n Too many service recoveries have been attempted for ($ServiceName). `n ($EventCount) recoveries are detected in the event log. `n Manual interventon is required.")
-  write-host "Too many service recoveries have been attempted for ($ServiceName). ($EventCount) recoveries are detected in the event log. Manual interventon is required."
-}
-
-# End of script section
-#=================================================================================
-#Log an event for script ending and total execution time.
-$EndTime = Get-Date
-$ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
-write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
-#=================================================================================
-# End of script		  
-		  </ScriptBody>
+         <Category>Custom</Category>
+        <WriteAction ID="PSWA" TypeID="Microsoft.Windows.Server.2016.Eventlog.Service.WA">
           <TimeoutSeconds>300</TimeoutSeconds>
         </WriteAction>
       </Recovery>
@@ -5166,6 +5419,8 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
         <DisplayString ElementID="Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum">
           <Name>Microsoft Windows Server Operating System 2016+ Monitoring Addendum</Name>
           <Description>
+v1.0.5.8 27 Dec 2023 Updated whitespace and monitor/rule reset logic updates, Recovery WA like TopProcess
+v1.0.5.7 16 Nov 2023 Commented logical disk workflows, correct powershell quote errors
 v1.0.5.6 18 Jul 2023 Updated reports for Informational alert, EventLog is full rule/DS and alert 
 v1.0.5.3 28 Jun 2023 Updated closure DS and WA for rule automation and comments
 v1.0.5.2 24 Apr 2023 GP report DS missing a + for $Test, overrides for MaxConcurrentAPI
