@@ -2,7 +2,7 @@
   <Manifest>
     <Identity>
       <ID>Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum</ID>
-      <Version>1.0.5.8</Version>
+      <Version>1.0.5.9</Version>
     </Identity>
     <Name>Microsoft Windows Server Operating System 2016 Monitoring Addendum</Name>
     <References>
@@ -70,7 +70,7 @@
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1058.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1059.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather WINOS 2016+ alerts and close via on demand task
@@ -84,7 +84,7 @@
 #=================================================================================
 # Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1058.ps1"
+$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1059.ps1"
 $EventID = "580"
 #=================================================================================
 
@@ -114,7 +114,7 @@ $bag = $momapi.CreatePropertyBag()
 
 #For a simple example - get files in Windows Temp:
 $date = get-date -uFormat "%Y-%m-%d"
-$Age = [DateTime](Get-Date).AddDays(-1)
+$Age = [DateTime](Get-Date).AddDays(-7)
 
 # Grab past 24 hours
 if ( (get-date).DayOfWeek -ne "Monday" )
@@ -135,14 +135,20 @@ $SCOMCoreMP = Get-SCOMManagementPack -DisplayName "Windows Server 2016 and above
 $SCOMCoreRules = $SCOMCoreMP.GetRules()
 $SCOMCoreMonitors = $SCOMCoreMP.GetMonitors()
 
-$SCOMCoreReportAlerts = Get-SCOMAlert | ? { ($_.Name -in $SCOMCoreRules.DisplayName) -or ($_.Name -in $SCOMCoreMonitors.DisplayName) }
+$SCOMCoreReportAlerts = Get-SCOMAlert -ResolutionState (0..254) | ? { ($_.Name -in $SCOMCoreRules.DisplayName) -or ($_.Name -in $SCOMCoreMonitors.DisplayName) }
 $SCOMCoreReportAlerts.Count
 
-$SCOMCoreRuleAlerts = Get-SCOMAlert | ? { ( $_.Name -in $SCOMCoreRules.DisplayName) -AND ( $_.ResolutionState -ne "255" ) }
+$SCOMCoreRuleAlerts = $SCOMCoreReportAlerts | ? { ( $_.Name -in $SCOMCoreRules.DisplayName) }
 $SCOMCoreRuleAlerts.Count
 
-$SCOMCoreMonitorAlerts = Get-SCOMAlert | ? { ($_.Name -in $SCOMCoreMonitors.DisplayName ) -AND ( $_.ResolutionState -ne "255" ) }
+$SCOMCoreMonitorAlerts = $SCOMCoreReportAlerts | ? { ($_.Name -in $SCOMCoreMonitors.DisplayName ) }
 $SCOMCoreMonitorAlerts.Count
+
+# Open/Closed breakout
+$OpenADDSAlerts = $SCOMCoreReportAlerts
+$OpenADDSAlerts.Count
+$ClosedADDSAlerts = Get-SCOMAlert -ResolutionState 255 | ? { ($_.Name -in $SCOMCoreRules.DisplayName) -or ($_.Name -in $SCOMCoreMonitors.DisplayName) }
+$ClosedADDSAlerts.Count
 
 
 #$Test = $ADFSAlerts.Count
@@ -370,7 +376,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Script Completed. `n Script
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1058.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1059.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup
@@ -394,7 +400,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1058.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1059.ps1"
 $EventID = "680"
 #=================================================================================
 
@@ -905,7 +911,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1058.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1059.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather GroupPolicyReport alerts and close via on demand task
@@ -919,7 +925,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
 #=================================================================================
 # Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1058.ps1"
+$ScriptName = "Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1059.ps1"
 $EventID = "552"
 #=================================================================================
 
@@ -1212,7 +1218,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-          <ScriptName>Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1058.ps1</ScriptName>
+          <ScriptName>Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1059.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Script to check event log size, retention, and overwrite properties WHEN alert cuts for Event Log is full
@@ -1226,7 +1232,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1058.ps1"
+$ScriptName = "Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1059.ps1"
 $EventID = "3750"
 #=================================================================================
 
@@ -1376,7 +1382,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1058.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1059.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather WINOS 2012 alerts and close via on demand task
@@ -1390,7 +1396,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
 #=================================================================================
 # Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1058.ps1"
+$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1059.ps1"
 $EventID = "581"
 #=================================================================================
 
@@ -1420,7 +1426,7 @@ $bag = $momapi.CreatePropertyBag()
 
 #For a simple example - get files in Windows Temp:
 $date = get-date -uFormat "%Y-%m-%d"
-$Age = [DateTime](Get-Date).AddDays(-1)
+$Age = [DateTime](Get-Date).AddDays(-7)
 
 # Grab past 24 hours
 if ( (get-date).DayOfWeek -ne "Monday" )
@@ -1441,14 +1447,20 @@ $SCOMCoreMP = Get-SCOMManagementPack -DisplayName "Windows Server 2016 and above
 $SCOMCoreRules = $SCOMCoreMP.GetRules()
 $SCOMCoreMonitors = $SCOMCoreMP.GetMonitors()
 
-$SCOMCoreReportAlerts = Get-SCOMAlert | ? { ($_.Name -in $SCOMCoreRules.DisplayName) -or ($_.Name -in $SCOMCoreMonitors.DisplayName) }
+$SCOMCoreReportAlerts = Get-SCOMAlert -ResolutionState (0..254) | ? { ($_.Name -in $SCOMCoreRules.DisplayName) -or ($_.Name -in $SCOMCoreMonitors.DisplayName) }
 $SCOMCoreReportAlerts.Count
 
-$SCOMCoreRuleAlerts = Get-SCOMAlert | ? { ( $_.Name -in $SCOMCoreRules.DisplayName) -AND ( $_.ResolutionState -ne "255" ) }
+$SCOMCoreRuleAlerts = $SCOMCoreReportAlerts | ? { ( $_.Name -in $SCOMCoreRules.DisplayName) }
 $SCOMCoreRuleAlerts.Count
 
-$SCOMCoreMonitorAlerts = Get-SCOMAlert | ? { ($_.Name -in $SCOMCoreMonitors.DisplayName ) -AND ( $_.ResolutionState -ne "255" ) }
+$SCOMCoreMonitorAlerts = $SCOMCoreReportAlerts | ? { ($_.Name -in $SCOMCoreMonitors.DisplayName ) }
 $SCOMCoreMonitorAlerts.Count
+
+# Open/Closed breakout
+$OpenADDSAlerts = $SCOMCoreReportAlerts
+$OpenADDSAlerts.Count
+$ClosedADDSAlerts = Get-SCOMAlert -ResolutionState 255 | ? { ($_.Name -in $SCOMCoreRules.DisplayName) -or ($_.Name -in $SCOMCoreMonitors.DisplayName) }
+$ClosedADDSAlerts.Count
 
 
 #$Test = $ADFSAlerts.Count
@@ -1645,7 +1657,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Script Completed. `n Script
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1058.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1059.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Proactive 2016+ logical disk cleanup manual task
@@ -1664,7 +1676,7 @@ $ComputerName = $env:ComputerName
 #$DriveLetter = "C"
 $DriveLetter
 #=================================================================================
-$ScriptName = "Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1058.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1059.ps1"
 $EventID = "681"
 #=================================================================================
 
@@ -2154,7 +2166,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Microsoft.Windows.Server.2016.Eventlog.Service.WA.v1058.ps1</ScriptName>
+                <ScriptName>Microsoft.Windows.Server.2016.Eventlog.Service.WA.v1059.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to restart a service
@@ -2175,7 +2187,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1058.ps1"
+$ScriptName = "Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1059.ps1"
 $EventID = "3750"
 #=================================================================================
 
@@ -3315,7 +3327,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
       <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1058.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1059.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -3339,7 +3351,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1058.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1059.ps1"
 $EventID = "680"
 #=================================================================================
 
@@ -3797,7 +3809,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
       <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1058.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1059.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -3821,7 +3833,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1058.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1059.ps1"
 $EventID = "680"
 #=================================================================================
 
@@ -4279,7 +4291,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
       <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1058.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1059.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -4303,7 +4315,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1058.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1059.ps1"
 $EventID = "680"
 #=================================================================================
 
@@ -4761,7 +4773,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
       <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1058.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1059.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -4785,7 +4797,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1058.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1059.ps1"
 $EventID = "680"
 #=================================================================================
 
@@ -5243,7 +5255,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
       <Recovery ID="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.Computer" Monitor="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="300">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1058.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1059.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive Group Policy System Event ID 1096 recovery
@@ -5263,7 +5275,7 @@ $ComputerName = $env:ComputerName
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1058.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1059.ps1"
 $EventID = "680"
 #=================================================================================
 
@@ -5419,6 +5431,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
         <DisplayString ElementID="Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum">
           <Name>Microsoft Windows Server Operating System 2016+ Monitoring Addendum</Name>
           <Description>
+v1.0.5.9  4 Jan 2024 Resolution State logic improvements for large environments
 v1.0.5.8 27 Dec 2023 Updated whitespace and monitor/rule reset logic updates, Recovery WA like TopProcess
 v1.0.5.7 16 Nov 2023 Commented logical disk workflows, correct powershell quote errors
 v1.0.5.6 18 Jul 2023 Updated reports for Informational alert, EventLog is full rule/DS and alert 
