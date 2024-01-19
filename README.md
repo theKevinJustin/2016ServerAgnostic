@@ -1,5 +1,5 @@
 # 2016ServerAgnostic
-Microsoft Windows Server Operating System 2016 Monitoring Addendum v1.0.5.9
+Microsoft Windows Server Operating System 2016 Monitoring Addendum v1.0.6.0
 
 Download [here](https://github.com/theKevinJustin/2016ServerAgnostic/blob/main/Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum.xml)
 
