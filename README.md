@@ -1,5 +1,5 @@
 # 2016ServerAgnostic
-Microsoft Windows Server Operating System 2016 Monitoring Addendum v1.0.6.0
+Microsoft Windows Server Operating System 2016 Monitoring Addendum v1.0.6.1
 
 Download [here](https://github.com/theKevinJustin/2016ServerAgnostic/blob/main/Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum.xml)
 
@@ -10,7 +10,7 @@ Blog [https://kevinjustin.com/blog/2023/08/28/os-addendum-packs/](https://kevinj
 
 # Version History:
 ```
-v1.0.6.0 18 Jan 2024 New AutomaticServices workflow DS/WA for monitor/rules.  Includes alerts, recovery rules
+v1.0.6.1 19 Jan 2024 New AutomaticServices workflow DS/WA for monitor/rules.  Includes alerts, recovery rules
 v1.0.5.9  4 Jan 2024 Resolution State logic improvements for large environments
 v1.0.5.8 27 Dec 2023 Updated whitespace and monitor/rule reset logic updates, Recovery WA like TopProcess
 v1.0.5.7 16 Nov 2023 Commented logical disk workflows, correct powershell quote erorrs
