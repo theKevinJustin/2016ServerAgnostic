@@ -2,7 +2,7 @@
   <Manifest>
     <Identity>
       <ID>Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum</ID>
-      <Version>1.0.5.9</Version>
+      <Version>1.0.6.2</Version>
     </Identity>
     <Name>Microsoft Windows Server Operating System 2016 Monitoring Addendum</Name>
     <References>
@@ -70,7 +70,7 @@
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1059.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1062.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather WINOS 2016+ alerts and close via on demand task
@@ -84,7 +84,7 @@
 #=================================================================================
 # Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1059.ps1"
+$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1062.ps1"
 $EventID = "580"
 #=================================================================================
 
@@ -114,7 +114,7 @@ $bag = $momapi.CreatePropertyBag()
 
 #For a simple example - get files in Windows Temp:
 $date = get-date -uFormat "%Y-%m-%d"
-$Age = [DateTime](Get-Date).AddDays(-7)
+$Age = [DateTime](Get-Date).AddDays(-1)
 
 # Grab past 24 hours
 if ( (get-date).DayOfWeek -ne "Monday" )
@@ -376,7 +376,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Script Completed. `n Script
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1059.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1062.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup
@@ -400,8 +400,8 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1059.ps1"
-$EventID = "680"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1062.ps1"
+$EventID = "585"
 #=================================================================================
 
 
@@ -911,7 +911,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1059.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1062.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather GroupPolicyReport alerts and close via on demand task
@@ -925,8 +925,8 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
 #=================================================================================
 # Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1059.ps1"
-$EventID = "552"
+$ScriptName = "Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1062.ps1"
+$EventID = "582"
 #=================================================================================
 
 
@@ -1218,7 +1218,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-          <ScriptName>Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1059.ps1</ScriptName>
+          <ScriptName>Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1062.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Script to check event log size, retention, and overwrite properties WHEN alert cuts for Event Log is full
@@ -1232,7 +1232,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1059.ps1"
+$ScriptName = "Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1062.ps1"
 $EventID = "3750"
 #=================================================================================
 
@@ -1370,6 +1370,305 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
         </ModuleImplementation>
         <OutputType>System!System.PropertyBagData</OutputType>
       </DataSourceModuleType>
+      <DataSourceModuleType ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.DS" Accessibility="Internal" Batching="false">
+        <Configuration>
+		  <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />	
+        </Configuration>
+        <OverrideableParameters>
+		  <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+		  <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <SimpleReccuringSchedule>
+                    <Interval Unit="Seconds">$Config/IntervalSeconds$</Interval>
+					<SyncTime>$Config/SyncTime$</SyncTime>
+                  </SimpleReccuringSchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
+                <ScriptName>Proactive.Microsoft.Windows.2016.AutomaticServices.DS.v1062.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Script to check automatic services
+#
+#  Author:  Kevin Justin
+#
+#  Version:  1.0
+#
+#=================================================================================
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging
+$ScriptName = "Proactive.Microsoft.Windows.2016.AutomaticServices.DataSource.v1062.ps1"
+$GEventID = "583"
+#=================================================================================
+
+# Starting Script section
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Script is starting. `n Running as ($whoami).")
+# PropertyBag Script section - Monitoring scripts get this
+#=================================================================================
+# Load SCOM PropertyBag function
+$bag = $momapi.CreatePropertyBag()
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+$date = get-date -uFormat "%Y-%m-%d %H%M"
+$Age = [DateTime](Get-Date).AddMinutes(-5)
+
+$Message = "Automatic Services - Monitor, run @ $date"
+
+# WMI method
+# gwmi Win32_Service | where { ( $_.StartMode = 'Auto' ) AND ( $_.State != 'Running' )  }
+# gwmi Win32_Service | where { ( $_.StartMode -eq 'Auto' ) -AND ( $_.State -ne 'Running' ) } | select DisplayName 
+
+
+# Get services
+$AutoServices = Get-Service | where { ( $_.StartType -eq 'Auto' ) }
+
+# Find what's running off first get-service
+$NOTRunningServices = $AutoServices | where { ( $_.Status -ne 'Running' ) } 
+# Debug
+# $NOTRunningServices | select Status,DisplayName,Name
+
+$ExcludedServices = @('Software Protection','SMS_BOOTSTRAP','McAfee Audit Manager Service' `
+	,'McAfee Temporary Installer Service','Remote Registry','Google Update Service (gupdate)','GISvc' `
+	,'Downloaded Maps Manager','McAfee Endpoint Security Web Control Service','IP Helper' `
+	,'Windows Biometric Service' )
+
+# Debug
+# $ExcludedServices
+
+# Test for ActivClient
+if ( $(Get-Service -Name "ActivID Shared Store Service" -ErrorAction 'SilentlyContinue' ).Count -eq $true )
+	{
+	# Debug
+	# write-host "ActivClient service exists = true"
+	# $ExcludedServices += "ActivID Shared Store Service"
+	$ExcludedServices += "Smart Card"
+	}
+
+# Debug
+# $ExcludedServices
+
+$Remainder = $NOTRunningServices | where { $_.DisplayName -notin $ExcludedServices }
+
+# Debug
+$Remainder
+
+
+# Begin service restarts logic and logging
+#=================================================================================
+$ServiceRestartingDetails = @()
+
+if ( $Remainder.Count -gt 0 )
+	{
+	# write-host "Restart any automatic startType services"
+	$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Begin Restart any automatic startType services. `n Service: ($ServiceName) is starting. `n Running as ($whoami).")
+	#=================================================================================
+	
+	foreach ( $Service in $Remainder.Name )
+		{
+		# Restart Service section
+		# [string]$ServiceName = $Service
+
+		# Log script event that we are starting task
+		$EventID = "3750"
+		# write-host "Automatic Services - Recovery script for service: ($ServiceName) is starting. Running as ($whoami)."
+		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Recovery script for service: ($ServiceName) is starting. `n Running as ($whoami).")
+
+
+		#Get the service object
+		$Svc = Get-Service $ServiceName
+
+		#Check to ensure the service exists:
+		IF (!$Svc)
+			{
+			# write-host "Automatic Services - Service ($ServiceName) was not found on this computer. This indicates a misconfiguration of the monitor. Error is ($error)"
+			$ServiceRestartingDetails += "Automatic Services - Service ($ServiceName) was not found on this computer. `n This indicates a misconfiguration of the monitor. `n Error is ($error)"
+			$momapi.LogScriptEvent($ScriptName,3751,2, "Automatic Services - Service ($ServiceName) was not found on this computer. `n This indicates a misconfiguration of the monitor. `n Error is ($error)")
+			EXIT
+			}
+
+			#Get Service Status:
+			[string]$SvcStatus = $Svc.Status
+
+		#Do not continue is service is already running
+		IF ($SvcStatus -eq "Running")
+			{
+			# write-host "Automatic Services - Service ($ServiceName) was found to be in the Running state. This indicates a misconfiguration of the monitor. No recovery action will be taken."
+			$ServiceRestartingDetails += "Automatic Services - Service ($ServiceName) was found to be in the Running state. `n This indicates a misconfiguration of the monitor. `n No recovery action will be taken."
+			$momapi.LogScriptEvent($ScriptName,3752,2, "Automatic Services - Service ($ServiceName) was found to be in the Running state. `n This indicates a misconfiguration of the monitor. `n No recovery action will be taken.")
+			EXIT  
+			}
+
+		# Log recovery information event
+		# write-host "Automatic Services - Service: ($ServiceName) was found to be in the ($SvcStatus) state.  Recovery will be attempted."
+		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Service: ($ServiceName) was found to be in the ($SvcStatus) state.  Recovery will be attempted.")
+
+		# Attempt First Recovery
+		# Restart-Service -Name $ServiceName -Force
+		get-Service -Name $ServiceName | start-service
+		# Wait time in seconds
+		Start-Sleep 20
+		#Get the service object
+		$Svc = Get-Service $ServiceName
+		# Get Service Status:
+		$SvcStatus = $Svc.Status
+
+		IF ($SvcStatus -ne "Running")
+			{
+			# Attempt Second Recovery
+			# write-host "Automatic Services - Service: ($ServiceName) second attempt at recovering starting now."
+			$ServiceRestartingDetails += "Automatic Services - Service: ($ServiceName) second attempt at recovering starting now."
+			$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Service: ($ServiceName) second attempt at recovering starting now.")  
+			# Restart-Service -Name $ServiceName -Force
+			get-Service -Name $ServiceName | start-service
+			Start-Sleep 20
+			$Svc = Get-Service $ServiceName
+			$SvcStatus = $Svc.Status 
+			}
+
+		IF ($SvcStatus -ne "Running")
+			{
+			# Attempt Third Recovery
+			# write-host "Automatic Services - Service: ($ServiceName) third attempt at recovering starting now." 
+			$ServiceRestartingDetails += "Automatic Services - Service: ($ServiceName) third attempt at recovering starting now."
+			$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Service: ($ServiceName) third attempt at recovering starting now.")
+   
+			# Restart-Service -Name $ServiceName -Force
+			get-Service -Name $ServiceName | start-service
+			Start-Sleep 20
+			$Svc = Get-Service $ServiceName
+			$SvcStatus = $Svc.Status 
+			}
+
+		IF ($SvcStatus -eq "Running")
+			{
+			# Log event of a successful restart
+			# write-host "Automatic Services - Service: ($ServiceName) was successfully restarted and then detected to be in the Running state."
+			$ServiceRestartingDetails += "Automatic Services - Service: ($ServiceName) was successfully restarted and then detected to be in the Running state."
+			$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Service: ($ServiceName) was successfully restarted and then detected to be in the Running state.")
+			}
+		ELSE
+			{
+			# Log event of a successful restart
+			# write-host "- Service: ($ServiceName) is not running. Recovery was attempted and failed. Manual intervention is required. The last detected service status was ($SvcStatus)."
+			$ServiceRestartingDetails += "Automatic Services - Service: ($ServiceName) is not running. `n Recovery was attempted and failed. `n Manual intervention is required. `n The last detected service status was ($SvcStatus)."
+			$momapi.LogScriptEvent($ScriptName,3753,2,"Automatic Services - Service: ($ServiceName) is not running. `n Recovery was attempted and failed. `n Manual intervention is required. `n The last detected service status was ($SvcStatus).") 
+			}
+
+		# Check to see if this recovery script has been run multiple times in the last x minutes for detection of too many recovery actions
+		$Message = "*($ServiceName) is starting*"
+		$Events = Get-EventLog -LogName 'Operations Manager' -After $StartTime.AddMinutes(-60) -Message $Message | where {$_.EventID -eq 3750}
+		$EventCount = $Events.Count
+		IF ($EventCount -ge 3)
+			{
+			# write-host "Automatic Services - Too many service recoveries have been attempted for ($ServiceName). ($EventCount) recoveries are detected in the event log. Manual intervention is required."
+			$ServiceRestartingDetails += "Automatic Services -  - Too many service recoveries have been attempted for ($ServiceName). `n ($EventCount) recoveries are detected in the event log. `n Manual intervention is required."
+			$momapi.LogScriptEvent($ScriptName,3754,2,"Automatic Services - Too many service recoveries have been attempted for ($ServiceName). `n ($EventCount) recoveries are detected in the event log. `n Manual intervention is required.")
+			}
+		}
+	}
+
+
+# Get services after restarts
+#=========================================
+$AfterRestarts = Get-Service | where { ( $_.StartType -eq 'Auto' ) -AND ( $_.Status -ne 'Running' ) -AND ( $_.DisplayName -notin $ExcludedServices ) }
+
+
+#Check the value of $strCondition
+#=========================================
+IF ( $AfterRestarts.Count -eq 0 )
+	{
+	$momapi.LogScriptEvent($ScriptName,$GEventID,0,"ZERO Services NOT running for Automatic Services workflow - NO action required")
+	$Result = "GoodCondition"
+
+	$bag.AddValue('Result',$Result)
+	$bag.AddValue('Message',"ZERO Services NOT running for Automatic Services workflow - NO action required")
+	#$bag.AddValue('Summary',$AfterRestartsSummary)
+	
+	}
+
+IF ( $AfterRestarts.Count -gt 0 )
+	{
+	$AfterRestartsSummary = @()
+
+	$AfterRestartsSummary += $Message
+	$AfterRestartsSummary += ""
+	$AfterRestartsSummary += "# Services still down after multiple restarts attempted:"
+	$AfterRestartsSummary += "#========================================================"
+	$AfterRestartsSummary += $AfterRestarts | select Status,DisplayName,Name
+	$AfterRestartsSummary += "#========================================================"
+	$AfterRestartsSummary += "# Restart details:"
+	$AfterRestartsSummary += $ServiceRestartingDetails
+	$AfterRestartsSummary += "#========================================================"
+
+	# This takes too long
+	# get-eventlog -logname "Operations Manager" -after $Age Automatic Services - Service
+	$AfterRestartsSummary += "#========================================================"
+
+	# Debug
+	$AfterRestartsSummary
+
+	$AfterRestartsSummary = $AfterRestartsSummary | out-string
+	
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$AfterRestartsSummary")
+
+	$Result = "BadCondition"
+	#$Message = "Services still down after multiple restarts attempted"
+
+	$bag.AddValue('Result',$Result)
+	$bag.AddValue('Message',$AfterRestartsSummary)
+	#$bag.AddValue('Summary',$AfterRestartsSummary)
+	}
+
+# Return all bags
+$bag
+
+#=================================================================================
+# End MAIN script section
+
+# End of script section
+#=================================================================================
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime) seconds."
+#=================================================================================
+# End of script
+                </ScriptBody>				
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
 
       <WriteActionModuleType ID="Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA" Accessibility="Internal" Batching="false">
         <Configuration>
@@ -1382,7 +1681,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1059.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1062.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather WINOS 2012 alerts and close via on demand task
@@ -1396,7 +1695,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
 #=================================================================================
 # Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1059.ps1"
+$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1062.ps1"
 $EventID = "581"
 #=================================================================================
 
@@ -1657,7 +1956,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Script Completed. `n Script
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1059.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1062.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Proactive 2016+ logical disk cleanup manual task
@@ -1676,8 +1975,8 @@ $ComputerName = $env:ComputerName
 #$DriveLetter = "C"
 $DriveLetter
 #=================================================================================
-$ScriptName = "Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1059.ps1"
-$EventID = "681"
+$ScriptName = "Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1062.ps1"
+$EventID = "586"
 #=================================================================================
 
 
@@ -1693,19 +1992,19 @@ $momapi = New-Object -comObject MOM.ScriptAPI
 $bag = $momapi.CreatePropertyBag()
 
 #Log script event that we are starting task
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script is starting. `n Running as ($whoami).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script is starting. `n Running as ($whoami).")
 #=================================================================================
 
 
 # Begin MAIN script section
 #=================================================================================
 #Log script parameters we received
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`nScript parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script parameters passed into datasource: `nDriveLetter: ($DriveLetter). `nComputerName: ($ComputerName).")
 
 #For a simple example - get files in Windows Temp:
 $date = get-date -uFormat "%Y-%m-%d"
 
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Gather Proactive Disk Cleanup Alert report for date ($date).")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather Proactive Disk Cleanup Alert report for date ($date).")
 
 $DSMessage = "Proactive Logical Disk Cleanup Alert for date ($date)."
 
@@ -2166,7 +2465,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Microsoft.Windows.Server.2016.Eventlog.Service.WA.v1059.ps1</ScriptName>
+                <ScriptName>Microsoft.Windows.Server.2016.Eventlog.Service.WA.v1062.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to restart a service
@@ -2187,7 +2486,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1059.ps1"
+$ScriptName = "Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1062.ps1"
 $EventID = "3750"
 #=================================================================================
 
@@ -2302,6 +2601,291 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
 #=================================================================================
 # End of script
 		  </ScriptBody>
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </WriteAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PSWA" />
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.BaseData</OutputType>
+        <InputType>System!System.BaseData</InputType>
+      </WriteActionModuleType>
+      <WriteActionModuleType ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule.WA" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" name="TimeoutSeconds" type="xsd:integer" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
+                <ScriptName>Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule.WA.v1062.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Script to check automatic services hourly WA rule
+#
+#  Author:  Kevin Justin
+#
+#  Version:  1.0
+#
+#=================================================================================
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging
+$ScriptName = "Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule.WA.v1062.ps1"
+$GEventID = "584"
+#=================================================================================
+
+# Starting Script section
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Script is starting. `n Running as ($whoami).")
+# PropertyBag Script section - Monitoring scripts get this
+#=================================================================================
+# Load SCOM PropertyBag function
+$bag = $momapi.CreatePropertyBag()
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+$date = get-date -uFormat "%Y-%m-%d %H%M"
+$Age = [DateTime](Get-Date).AddMinutes(-5)
+
+$Message = "Automatic Services - Monitor, run @ $date"
+
+# WMI method
+# gwmi Win32_Service | where { ( $_.StartMode = 'Auto' ) AND ( $_.State != 'Running' )  }
+# gwmi Win32_Service | where { ( $_.StartMode -eq 'Auto' ) -AND ( $_.State -ne 'Running' ) } | select DisplayName 
+
+
+# Get services
+$AutoServices = Get-Service | where { ( $_.StartType -eq 'Auto' ) }
+
+# Find what's running off first get-service
+$NOTRunningServices = $AutoServices | where { ( $_.Status -ne 'Running' ) } 
+# Debug
+# $NOTRunningServices | select Status,DisplayName,Name
+
+$ExcludedServices = @('Software Protection','SMS_BOOTSTRAP','McAfee Audit Manager Service' `
+	,'McAfee Temporary Installer Service','Remote Registry','Google Update Service (gupdate)','GISvc' `
+	,'Downloaded Maps Manager','McAfee Endpoint Security Web Control Service','IP Helper' `
+	,'Windows Biometric Service' )
+
+# Debug
+# $ExcludedServices
+
+# Test for ActivClient
+if ( $(Get-Service -Name "ActivID Shared Store Service" -ErrorAction 'SilentlyContinue' ).Count -eq $true )
+	{
+	# Debug
+	# write-host "ActivClient service exists = true"
+	# $ExcludedServices += "ActivID Shared Store Service"
+	$ExcludedServices += "Smart Card"
+	}
+
+# Debug
+# $ExcludedServices
+
+$Remainder = $NOTRunningServices | where { $_.DisplayName -notin $ExcludedServices }
+
+# Debug
+$Remainder
+
+
+# Begin service restarts logic and logging
+#=================================================================================
+$ServiceRestartingDetails = @()
+
+if ( $Remainder.Count -gt 0 )
+	{
+	# write-host "Restart any automatic startType services"
+	$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Begin Restart any automatic startType services. `n Service: ($ServiceName) is starting. `n Running as ($whoami).")
+	#=================================================================================
+	
+	foreach ( $Service in $Remainder.Name )
+		{
+		# Restart Service section
+		# [string]$ServiceName = $Service
+
+		# Log script event that we are starting task
+		$EventID = "3750"
+		# write-host "Automatic Services - Recovery script for service: ($ServiceName) is starting. Running as ($whoami)."
+		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Recovery script for service: ($ServiceName) is starting. `n Running as ($whoami).")
+
+
+		#Get the service object
+		$Svc = Get-Service $ServiceName
+
+		#Check to ensure the service exists:
+		IF (!$Svc)
+			{
+			# write-host "Automatic Services - Service ($ServiceName) was not found on this computer. This indicates a misconfiguration of the monitor. Error is ($error)"
+			$ServiceRestartingDetails += "Automatic Services - Service ($ServiceName) was not found on this computer. `n This indicates a misconfiguration of the monitor. `n Error is ($error)"
+			$momapi.LogScriptEvent($ScriptName,3751,2, "Automatic Services - Service ($ServiceName) was not found on this computer. `n This indicates a misconfiguration of the monitor. `n Error is ($error)")
+			EXIT
+			}
+
+			#Get Service Status:
+			[string]$SvcStatus = $Svc.Status
+
+		#Do not continue is service is already running
+		IF ($SvcStatus -eq "Running")
+			{
+			# write-host "Automatic Services - Service ($ServiceName) was found to be in the Running state. This indicates a misconfiguration of the monitor. No recovery action will be taken."
+			$ServiceRestartingDetails += "Automatic Services - Service ($ServiceName) was found to be in the Running state. `n This indicates a misconfiguration of the monitor. `n No recovery action will be taken."
+			$momapi.LogScriptEvent($ScriptName,3752,2, "Automatic Services - Service ($ServiceName) was found to be in the Running state. `n This indicates a misconfiguration of the monitor. `n No recovery action will be taken.")
+			EXIT  
+			}
+
+		# Log recovery information event
+		# write-host "Automatic Services - Service: ($ServiceName) was found to be in the ($SvcStatus) state.  Recovery will be attempted."
+		$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Service: ($ServiceName) was found to be in the ($SvcStatus) state.  Recovery will be attempted.")
+
+		# Attempt First Recovery
+		# Restart-Service -Name $ServiceName -Force
+		get-Service -Name $ServiceName | start-service
+		# Wait time in seconds
+		Start-Sleep 20
+		#Get the service object
+		$Svc = Get-Service $ServiceName
+		# Get Service Status:
+		$SvcStatus = $Svc.Status
+
+		IF ($SvcStatus -ne "Running")
+			{
+			# Attempt Second Recovery
+			# write-host "Automatic Services - Service: ($ServiceName) second attempt at recovering starting now."
+			$ServiceRestartingDetails += "Automatic Services - Service: ($ServiceName) second attempt at recovering starting now."
+			$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Service: ($ServiceName) second attempt at recovering starting now.")  
+			# Restart-Service -Name $ServiceName -Force
+			get-Service -Name $ServiceName | start-service
+			Start-Sleep 20
+			$Svc = Get-Service $ServiceName
+			$SvcStatus = $Svc.Status 
+			}
+
+		IF ($SvcStatus -ne "Running")
+			{
+			# Attempt Third Recovery
+			# write-host "Automatic Services - Service: ($ServiceName) third attempt at recovering starting now." 
+			$ServiceRestartingDetails += "Automatic Services - Service: ($ServiceName) third attempt at recovering starting now."
+			$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Service: ($ServiceName) third attempt at recovering starting now.")
+   
+			# Restart-Service -Name $ServiceName -Force
+			get-Service -Name $ServiceName | start-service
+			Start-Sleep 20
+			$Svc = Get-Service $ServiceName
+			$SvcStatus = $Svc.Status 
+			}
+
+		IF ($SvcStatus -eq "Running")
+			{
+			# Log event of a successful restart
+			# write-host "Automatic Services - Service: ($ServiceName) was successfully restarted and then detected to be in the Running state."
+			$ServiceRestartingDetails += "Automatic Services - Service: ($ServiceName) was successfully restarted and then detected to be in the Running state."
+			$momapi.LogScriptEvent($ScriptName,$EventID,0,"Automatic Services - Service: ($ServiceName) was successfully restarted and then detected to be in the Running state.")
+			}
+		ELSE
+			{
+			# Log event of a successful restart
+			# write-host "- Service: ($ServiceName) is not running. Recovery was attempted and failed. Manual intervention is required. The last detected service status was ($SvcStatus)."
+			$ServiceRestartingDetails += "Automatic Services - Service: ($ServiceName) is not running. `n Recovery was attempted and failed. `n Manual intervention is required. `n The last detected service status was ($SvcStatus)."
+			$momapi.LogScriptEvent($ScriptName,3753,2,"Automatic Services - Service: ($ServiceName) is not running. `n Recovery was attempted and failed. `n Manual intervention is required. `n The last detected service status was ($SvcStatus).") 
+			}
+
+		# Check to see if this recovery script has been run multiple times in the last x minutes for detection of too many recovery actions
+		$Message = "*($ServiceName) is starting*"
+		$Events = Get-EventLog -LogName 'Operations Manager' -After $StartTime.AddMinutes(-60) -Message $Message | where {$_.EventID -eq 3750}
+		$EventCount = $Events.Count
+		IF ($EventCount -ge 3)
+			{
+			# write-host "Automatic Services - Too many service recoveries have been attempted for ($ServiceName). ($EventCount) recoveries are detected in the event log. Manual intervention is required."
+			$ServiceRestartingDetails += "Automatic Services -  - Too many service recoveries have been attempted for ($ServiceName). `n ($EventCount) recoveries are detected in the event log. `n Manual intervention is required."
+			$momapi.LogScriptEvent($ScriptName,3754,2,"Automatic Services - Too many service recoveries have been attempted for ($ServiceName). `n ($EventCount) recoveries are detected in the event log. `n Manual intervention is required.")
+			}
+		}
+	}
+
+
+# Get services after restarts
+#=========================================
+$AfterRestarts = Get-Service | where { ( $_.StartType -eq 'Auto' ) -AND ( $_.Status -ne 'Running' ) -AND ( $_.DisplayName -notin $ExcludedServices ) }
+
+
+#Check the value of $strCondition
+#=========================================
+IF ( $AfterRestarts.Count -eq 0 )
+	{
+	$momapi.LogScriptEvent($ScriptName,$GEventID,0,"ZERO Services NOT running for Automatic Services workflow - NO action required")
+	$Result = "GoodCondition"
+
+	$bag.AddValue('Result',$Result)
+	$bag.AddValue('Message',"ZERO Services NOT running for Automatic Services workflow - NO action required")
+	#$bag.AddValue('Summary',$AfterRestartsSummary)
+	
+	}
+
+IF ( $AfterRestarts.Count -gt 0 )
+	{
+	$AfterRestartsSummary = @()
+
+	$AfterRestartsSummary += $Message
+	$AfterRestartsSummary += ""
+	$AfterRestartsSummary += "# Services still down after multiple restarts attempted:"
+	$AfterRestartsSummary += "#========================================================"
+	$AfterRestartsSummary += $AfterRestarts | select Status,DisplayName,Name
+	$AfterRestartsSummary += "#========================================================"
+	$AfterRestartsSummary += "# Restart details:"
+	$AfterRestartsSummary += $ServiceRestartingDetails
+	$AfterRestartsSummary += "#========================================================"
+
+	# This takes too long
+	# get-eventlog -logname "Operations Manager" -after $Age Automatic Services - Service
+	$AfterRestartsSummary += "#========================================================"
+
+	# Debug
+	$AfterRestartsSummary
+
+	$AfterRestartsSummary = $AfterRestartsSummary | out-string
+	
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$AfterRestartsSummary")
+
+	$Result = "BadCondition"
+	#$Message = "Services still down after multiple restarts attempted"
+
+	$bag.AddValue('Result',$Result)
+	$bag.AddValue('Message',$AfterRestartsSummary)
+	#$bag.AddValue('Summary',$AfterRestartsSummary)
+	}
+
+# Return all bags
+$bag
+
+#=================================================================================
+# End MAIN script section
+
+# End of script section
+#=================================================================================
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime) seconds."
+#=================================================================================
+# End of script
+                </ScriptBody>
                 <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
               </WriteAction>
             </MemberModules>
@@ -2544,6 +3128,86 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
           </OnDemandDetections>
         </MonitorImplementation>
       </UnitMonitorType>
+      <UnitMonitorType ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.MonitorType" Accessibility="Internal">
+        <MonitorTypeStates>
+          <MonitorTypeState ID="GoodCondition" NoDetection="false" />
+          <MonitorTypeState ID="BadCondition" NoDetection="false" />
+        </MonitorTypeStates>
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="MatchCount" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+		  <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+		  <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="MatchCount" Selector="$Config/MatchCount$" ParameterType="int" />		  
+        </OverrideableParameters>
+        <MonitorImplementation>
+          <MemberModules>
+            <DataSource ID="DS" TypeID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.DS">
+			  <IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds>
+			  <SyncTime>$Config/SyncTime$</SyncTime>
+			  <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+            </DataSource>
+            <ConditionDetection ID="GoodConditionFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">GoodCondition</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="BadConditionFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">BadCondition</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+			  <SuppressionSettings>
+                <MatchCount>$Config/MatchCount$</MatchCount>
+              </SuppressionSettings>
+            </ConditionDetection>
+          </MemberModules>
+          <RegularDetections>
+            <RegularDetection MonitorTypeStateID="GoodCondition">
+              <Node ID="GoodConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+            <RegularDetection MonitorTypeStateID="BadCondition">
+              <Node ID="BadConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+          </RegularDetections>
+          <OnDemandDetections>
+            <OnDemandDetection MonitorTypeStateID="GoodCondition">
+              <Node ID="GoodConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+            <OnDemandDetection MonitorTypeStateID="BadCondition">
+              <Node ID="BadConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+          </OnDemandDetections>
+        </MonitorImplementation>
+      </UnitMonitorType>
     </MonitorTypes>
   </TypeDefinitions>
   <Monitoring>
@@ -2665,7 +3329,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
                     </ValueExpression>
                     <Operator>Equal</Operator>
                     <ValueExpression>
-                      <Value Type="UnsignedInteger">681</Value>
+                      <Value Type="UnsignedInteger">586</Value>
                     </ValueExpression>
                   </SimpleExpression>
                 </Expression>
@@ -2701,63 +3365,6 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
             <AlertDescription />
             <AlertOwner />
             <AlertMessageId>$MPElement[Name="Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Script.Task.Alert.Rule.AlertMessage"]$</AlertMessageId>
-            <AlertParameters>
-              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
-            </AlertParameters>
-            <Suppression />
-          </WriteAction>
-        </WriteActions>
-      </Rule>
-      <Rule ID="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Task.Alert.Rule" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.Computer" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
-        <Category>Alert</Category>
-        <DataSources>
-          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
-            <LogName>Operations Manager</LogName>
-            <Expression>
-              <And>
-                <Expression>
-                  <SimpleExpression>
-                    <ValueExpression>
-                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
-                    </ValueExpression>
-                    <Operator>Equal</Operator>
-                    <ValueExpression>
-                      <Value Type="UnsignedInteger">680</Value>
-                    </ValueExpression>
-                  </SimpleExpression>
-                </Expression>
-                <Expression>
-                  <SimpleExpression>
-                    <ValueExpression>
-                      <XPathQuery Type="String">PublisherName</XPathQuery>
-                    </ValueExpression>
-                    <Operator>Equal</Operator>
-                    <ValueExpression>
-                      <Value Type="String">Health Service Script</Value>
-                    </ValueExpression>
-                  </SimpleExpression>
-                </Expression>
-                <Expression>
-                  <RegExExpression>
-                    <ValueExpression>
-                      <XPathQuery Type="String">EventDescription</XPathQuery>
-                    </ValueExpression>
-                    <Operator>ContainsSubstring</Operator>
-                    <Pattern>action required to fix group policy on server</Pattern>
-                  </RegExExpression>
-                </Expression>
-              </And>
-            </Expression>
-          </DataSource>
-        </DataSources>
-        <WriteActions>
-          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
-            <Priority>1</Priority>
-            <Severity>1</Severity>
-            <AlertName />
-            <AlertDescription />
-            <AlertOwner />
-            <AlertMessageId>$MPElement[Name="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Task.Alert.Rule.AlertMessage"]$</AlertMessageId>
             <AlertParameters>
               <AlertParameter1>$Data/EventDescription$</AlertParameter1>
             </AlertParameters>
@@ -3053,7 +3660,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
           </WriteAction>
         </WriteActions>
       </Rule>
-      <Rule ID="Proactive.DailyTasks.Microsoft.Windows.2016.Eventlog.Full.Script.Alert.Rule" Enabled="false" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+      <Rule ID="Proactive.DailyTasks.Microsoft.Windows.2016.Eventlog.Full.Script.Alert.Rule" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
         <Category>Alert</Category>
         <DataSources>
           <DataSource ID="DS" TypeID="Proactive.DailyTasks.Microsoft.Windows.2016.Eventlog.Full.Script.DataSource">
@@ -3073,6 +3680,370 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
             <Suppression>
               <SuppressionValue>$Data/Property[@Name='Message']$</SuppressionValue>
             </Suppression>
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Custom</Category>
+        <DataSources>
+          <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+            <Scheduler>
+              <SimpleReccuringSchedule>
+                <Interval Unit="Seconds">3602</Interval>
+				        <SyncTime>00:02</SyncTime>
+              </SimpleReccuringSchedule>
+              <ExcludeDates />
+            </Scheduler>
+          </DataSource>	
+        </DataSources>
+		<WriteActions>
+          <WriteAction ID="WA" TypeID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule.WA">
+            <TimeoutSeconds>300</TimeoutSeconds>
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Event.Rule" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
+            <LogName>Operations Manager</LogName>
+            <Expression>
+              <And>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="UnsignedInteger">583</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">PublisherName</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="String">Health Service Script</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <RegExExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">EventDescription</XPathQuery>
+                    </ValueExpression>
+                    <Operator>ContainsSubstring</Operator>
+                    <Pattern>Automatic Services - WA audit for past hour</Pattern>
+                  </RegExExpression>
+                </Expression>
+              </And>
+            </Expression>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>0</Severity>
+            <AlertName />
+            <AlertDescription />
+            <AlertOwner />
+            <AlertMessageId>$MPElement[Name="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Event.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
+            </AlertParameters>
+            <Suppression />
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.Microsoft.Windows.2016.AutomaticServices.NotFound.Recovery.Rule" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
+            <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName>
+            <LogName>Operations Manager</LogName>
+            <Expression>
+              <And>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="UnsignedInteger">3751</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">PublisherName</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="String">Health Service Script</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <RegExExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">Params/Param[2]</XPathQuery>
+                    </ValueExpression>
+                    <Operator>ContainsSubstring</Operator>
+                    <Pattern>Automatic Services - </Pattern>
+                  </RegExExpression>
+                </Expression>
+              </And>
+            </Expression>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>1</Severity>
+            <AlertName />
+            <AlertDescription />
+            <AlertOwner />
+            <AlertMessageId>$MPElement[Name="Proactive.Microsoft.Windows.2016.AutomaticServices.NotFound.Recovery.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
+            </AlertParameters>
+            <Suppression>
+              <SuppressionValue>$Data[Default='']/EventDisplayNumber$</SuppressionValue>
+              <SuppressionValue>$Data[Default='']/PublisherName$</SuppressionValue>
+              <SuppressionValue>$Data[Default='']/LoggingComputer$</SuppressionValue>
+            </Suppression>
+            <Custom1 />
+            <Custom2 />
+            <Custom3 />
+            <Custom4 />
+            <Custom5 />
+            <Custom6 />
+            <Custom7 />
+            <Custom8 />
+            <Custom9 />
+            <Custom10 />
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.Microsoft.Windows.2016.AutomaticServices.FoundRunning.Recovery.Rule" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
+            <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName>
+            <LogName>Operations Manager</LogName>
+            <Expression>
+              <And>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="UnsignedInteger">3752</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">PublisherName</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="String">Health Service Script</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <RegExExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">Params/Param[2]</XPathQuery>
+                    </ValueExpression>
+                    <Operator>ContainsSubstring</Operator>
+                    <Pattern>Automatic Services - </Pattern>
+                  </RegExExpression>
+                </Expression>
+              </And>
+            </Expression>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>1</Severity>
+            <AlertName />
+            <AlertDescription />
+            <AlertOwner />
+            <AlertMessageId>$MPElement[Name="Proactive.Microsoft.Windows.2016.AutomaticServices.FoundRunning.Recovery.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
+            </AlertParameters>
+            <Suppression>
+              <SuppressionValue>$Data[Default='']/EventDisplayNumber$</SuppressionValue>
+              <SuppressionValue>$Data[Default='']/PublisherName$</SuppressionValue>
+              <SuppressionValue>$Data[Default='']/LoggingComputer$</SuppressionValue>
+            </Suppression>
+            <Custom1 />
+            <Custom2 />
+            <Custom3 />
+            <Custom4 />
+            <Custom5 />
+            <Custom6 />
+            <Custom7 />
+            <Custom8 />
+            <Custom9 />
+            <Custom10 />
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.Microsoft.Windows.2016.AutomaticServices.RecoveryFailed.Recovery.Rule" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
+            <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName>
+            <LogName>Operations Manager</LogName>
+            <Expression>
+              <And>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="UnsignedInteger">3753</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">PublisherName</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="String">Health Service Script</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <RegExExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">Params/Param[2]</XPathQuery>
+                    </ValueExpression>
+                    <Operator>ContainsSubstring</Operator>
+                    <Pattern>Automatic Services - </Pattern>
+                  </RegExExpression>
+                </Expression>
+              </And>
+            </Expression>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>1</Severity>
+            <AlertName />
+            <AlertDescription />
+            <AlertOwner />
+            <AlertMessageId>$MPElement[Name="Proactive.Microsoft.Windows.2016.AutomaticServices.RecoveryFailed.Recovery.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
+            </AlertParameters>
+            <Suppression>
+              <SuppressionValue>$Data[Default='']/EventDisplayNumber$</SuppressionValue>
+              <SuppressionValue>$Data[Default='']/PublisherName$</SuppressionValue>
+              <SuppressionValue>$Data[Default='']/LoggingComputer$</SuppressionValue>
+            </Suppression>
+            <Custom1 />
+            <Custom2 />
+            <Custom3 />
+            <Custom4 />
+            <Custom5 />
+            <Custom6 />
+            <Custom7 />
+            <Custom8 />
+            <Custom9 />
+            <Custom10 />
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.Microsoft.Windows.2016.AutomaticServices.TooManyRecoveryAttempts.Recovery.Rule" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
+            <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName>
+            <LogName>Operations Manager</LogName>
+            <Expression>
+              <And>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="UnsignedInteger">3754</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">PublisherName</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="String">Health Service Script</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <RegExExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">Params/Param[2]</XPathQuery>
+                    </ValueExpression>
+                    <Operator>ContainsSubstring</Operator>
+                    <Pattern>Automatic Services - </Pattern>
+                  </RegExExpression>
+                </Expression>
+              </And>
+            </Expression>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>1</Severity>
+            <AlertName />
+            <AlertDescription />
+            <AlertOwner />
+            <AlertMessageId>$MPElement[Name="Proactive.Microsoft.Windows.2016.AutomaticServices.TooManyRecoveryAttempts.Recovery.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
+            </AlertParameters>
+            <Suppression>
+              <SuppressionValue>$Data[Default='']/EventDisplayNumber$</SuppressionValue>
+              <SuppressionValue>$Data[Default='']/PublisherName$</SuppressionValue>
+              <SuppressionValue>$Data[Default='']/LoggingComputer$</SuppressionValue>
+            </Suppression>
+            <Custom1 />
+            <Custom2 />
+            <Custom3 />
+            <Custom4 />
+            <Custom5 />
+            <Custom6 />
+            <Custom7 />
+            <Custom8 />
+            <Custom9 />
+            <Custom10 />
           </WriteAction>
         </WriteActions>
       </Rule>
@@ -3322,12 +4293,34 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
           <RepeatCount>5</RepeatCount>
         </Configuration>
       </UnitMonitor>
+      <UnitMonitor ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor" Accessibility="Public" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.Computer" ParentMonitorID="Health!System.Health.AvailabilityState" Remotable="true" Priority="Normal" TypeID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.MonitorType" ConfirmDelivery="true">
+        <Category>AvailabilityHealth</Category>
+        <AlertSettings AlertMessage="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.AlertMessage">
+          <AlertOnState>Warning</AlertOnState>  <!-- Warning or Error should match OperationalStates below  -->
+          <AutoResolve>true</AutoResolve>
+          <AlertPriority>Normal</AlertPriority>
+          <AlertSeverity>MatchMonitorHealth</AlertSeverity>  <!-- Common options for AlertSeverity are MatchMonitorHealth, Information, Warning, Error -->
+          <AlertParameters>
+            <AlertParameter1>$Data/Context/Property[@Name='Message']$</AlertParameter1> <!-- This is an example of passing property output from the script into the alert description -->
+          </AlertParameters>
+        </AlertSettings>
+        <OperationalStates>
+          <OperationalState ID="GoodCondition" MonitorTypeStateID="GoodCondition" HealthState="Success" />
+          <OperationalState ID="BadCondition" MonitorTypeStateID="BadCondition" HealthState="Warning" />  <!-- HealthState = Warning or Error -->
+        </OperationalStates>
+        <Configuration>
+          <IntervalSeconds>1803</IntervalSeconds>
+		  <SyncTime>00:04</SyncTime>
+          <TimeoutSeconds>240</TimeoutSeconds>
+		  <MatchCount>2</MatchCount>  <!-- This is the number of consecutive matches that must be met before the monitor will change state.  Also a good example of passing in Integer data. -->
+        </Configuration>
+      </UnitMonitor>
     </Monitors>
     <Recoveries>
       <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1059.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1062.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -3351,8 +4344,8 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1059.ps1"
-$EventID = "680"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1062.ps1"
+$EventID = "587"
 #=================================================================================
 
 
@@ -3809,7 +4802,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
       <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1059.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1062.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -3833,8 +4826,8 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1059.ps1"
-$EventID = "680"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1062.ps1"
+$EventID = "588"
 #=================================================================================
 
 
@@ -4291,7 +5284,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
       <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1059.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1062.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -4315,8 +5308,8 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1059.ps1"
-$EventID = "680"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1062.ps1"
+$EventID = "587"
 #=================================================================================
 
 
@@ -4773,7 +5766,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
       <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1059.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1062.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -4797,8 +5790,8 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1059.ps1"
-$EventID = "680"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1062.ps1"
+$EventID = "588"
 #=================================================================================
 
 
@@ -5255,7 +6248,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
       <Recovery ID="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.Computer" Monitor="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="300">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1059.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1062.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive Group Policy System Event ID 1096 recovery
@@ -5275,8 +6268,8 @@ $ComputerName = $env:ComputerName
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1059.ps1"
-$EventID = "680"
+$ScriptName = "Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1062.ps1"
+$EventID = "589"
 #=================================================================================
 
 
@@ -5416,13 +6409,18 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
       <StringResource ID="Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.AlertMessage" />
       <StringResource ID="Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Script.Task.Alert.Rule.AlertMessage" />
       <StringResource ID="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.AlertMessage" />
-      <StringResource ID="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Task.Alert.Rule.AlertMessage" />
       <StringResource ID="Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.Rule.AlertMessage" />
       <StringResource ID="Proactive.DailyTasks.Microsoft.Windows.2016.Eventlog.Full.Script.Alert.Rule.AlertMessage" />
       <StringResource ID="Microsoft.Windows.Server.2016.Eventlog.Service.NotFound.Recovery.Rule.AlertMessage" />
       <StringResource ID="Microsoft.Windows.Server.2016.Eventlog.Service.FoundRunning.Recovery.Rule.AlertMessage" />
       <StringResource ID="Microsoft.Windows.Server.2016.Eventlog.Service.RecoveryFailed.Recovery.Rule.AlertMessage" />
       <StringResource ID="Microsoft.Windows.Server.2016.Eventlog.Service.TooManyRecoveryAttempts.Recovery.Rule.AlertMessage" />
+	  <StringResource ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.AlertMessage" />
+	  <StringResource ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Event.Rule.AlertMessage" />
+      <StringResource ID="Proactive.Microsoft.Windows.2016.AutomaticServices.NotFound.Recovery.Rule.AlertMessage" />
+      <StringResource ID="Proactive.Microsoft.Windows.2016.AutomaticServices.FoundRunning.Recovery.Rule.AlertMessage" />
+      <StringResource ID="Proactive.Microsoft.Windows.2016.AutomaticServices.RecoveryFailed.Recovery.Rule.AlertMessage" />
+      <StringResource ID="Proactive.Microsoft.Windows.2016.AutomaticServices.TooManyRecoveryAttempts.Recovery.Rule.AlertMessage" />
     </StringResources>
   </Presentation>
   <LanguagePacks>
@@ -5431,6 +6429,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
         <DisplayString ElementID="Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum">
           <Name>Microsoft Windows Server Operating System 2016+ Monitoring Addendum</Name>
           <Description>
+v1.0.6.2 20 Jan 2024 New AutomaticServices workflow DS/WA for monitor/rules.  Includes alerts, recovery rules, changed EventID's
 v1.0.5.9  4 Jan 2024 Resolution State logic improvements for large environments
 v1.0.5.8 27 Dec 2023 Updated whitespace and monitor/rule reset logic updates, Recovery WA like TopProcess
 v1.0.5.7 16 Nov 2023 Commented logical disk workflows, correct powershell quote errors
@@ -5472,6 +6471,10 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
           <Name>Proactive Microsoft Windows 2016 Event Log full DataSource</Name>
           <Description>This datasource sets event logs to retention, size, and overwrite properties</Description>
         </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.DS">
+          <Name>Proactive Microsoft Windows 2016 AutomaticServices Monitor DataSource</Name>
+          <Description>This datasource identifies and restarts any automatic services NOT in running state.</Description>
+        </DisplayString>
 
         <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA">
           <Name>Proactive DailyTasks WINOSAlerts report and auto-close on-demand task</Name>
@@ -5485,6 +6488,10 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
           <Name>Proactive Microsoft Windows Server EventLog service WA</Name>
           <Description>This write-action task restarts EventLog service</Description>
         </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule.WA">
+          <Name>Proactive Microsoft Windows Server Automatic Services Hourly WA</Name>
+          <Description>This write-action task identifies and restarts any automatic services NOT in running state.</Description>
+        </DisplayString>
 
         <DisplayString ElementID="Proactive.WINOS.Repeated.Event.MonitorType">
           <Name>Proactive WINOS Repeated Event MonitorType</Name>
@@ -5494,6 +6501,9 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
         </DisplayString>
         <DisplayString ElementID="Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.MonitorType">
           <Name>Proactive Microsoft Windows Logical Disk Cleanup MonitorType</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.MonitorType">
+          <Name>Proactive Microsoft Windows Automatic Services Warning Monitor MonitorType</Name>
         </DisplayString>
 
         <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Alert.Rule">
@@ -5518,14 +6528,6 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
         </DisplayString>
         <DisplayString ElementID="Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Script.Task.Alert.Rule.AlertMessage">
           <Name>Proactive Microsoft Windows LogicalDisk Cleanup Task Rule Alert</Name>
-          <Description>{0}</Description>
-        </DisplayString>
-        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Task.Alert.Rule">
-          <Name>Proactive Microsoft Windows Server GroupPolicy EventId 1096 Task Rule Alert</Name>
-          <Description>{0}</Description>
-        </DisplayString>
-        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Task.Alert.Rule.AlertMessage">
-          <Name>Proactive Microsoft Windows Server GroupPolicy EventId 1096 Task Rule Alert</Name>
           <Description>{0}</Description>
         </DisplayString>
         <DisplayString ElementID="Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.Rule">
@@ -5572,10 +6574,48 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
         </DisplayString>
         <DisplayString ElementID="Proactive.DailyTasks.Microsoft.Windows.2016.Eventlog.Full.Script.Alert.Rule.AlertMessage">
           <Name>Proactive DailyTasks Microsoft Windows 2016 EventLog Full Script Alert Rule</Name>
-          <Description>{1}
-
-{2}</Description>
+          <Description>{0}</Description>
         </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule">
+          <Name>Proactive Microsoft Windows 2016 Automatic Services Hourly Alert Rule</Name>
+          <Description>Runs hourly to evaluate services set to automatic are running</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Event.Rule">
+          <Name>Proactive Microsoft Windows 2016 Automatic Services Hourly Event Alert Rule</Name>
+          <Description>Runs hourly to evaluate services set to automatic are running</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Event.Rule.AlertMessage">
+          <Name>Proactive Microsoft Windows 2016 Automatic Services Hourly Event Alert Rule</Name>
+          <Description>{0}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.NotFound.Recovery.Rule">
+          <Name>Microsoft Windows Server 2016 AutomaticServices Service Recovery Failed - Service Not Found Rule</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.NotFound.Recovery.Rule.AlertMessage">
+          <Name>Microsoft Windows Server 2016 AutomaticServices Service Recovery Failed - Service Not Found</Name>
+          <Description>Event Description: {0}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.FoundRunning.Recovery.Rule">
+          <Name>Microsoft Windows Server 2016 AutomaticServices Service Failed - Service Already Running Rule</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.FoundRunning.Recovery.Rule.AlertMessage">
+          <Name>Microsoft Windows Server 2016 AutomaticServices Service Recovery Failed - Service Already Running</Name>
+          <Description>Event Description: {0}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.RecoveryFailed.Recovery.Rule">
+          <Name>Microsoft Windows Server 2016 AutomaticServices Service Recovery Failed - Service is not running Rule</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.RecoveryFailed.Recovery.Rule.AlertMessage">
+          <Name>Microsoft Windows Server 2016 AutomaticServices Service Recovery Failed - Service is not running</Name>
+          <Description>Event Description: {0}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.TooManyRecoveryAttempts.Recovery.Rule">
+          <Name>Microsoft Windows Server 2016 AutomaticServices Service Recovery has attempted to recover the service too many times Rule</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.TooManyRecoveryAttempts.Recovery.Rule.AlertMessage">
+          <Name>Microsoft Windows Server 2016 AutomaticServices Service Recovery has attempted to recover the service too many times</Name>
+          <Description>Event Description: {0}</Description>
+		</DisplayString>
 
         <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Task">
           <Name>Proactive DailyTasks WINOSAlerts Autoclose Report Script Task</Name>
@@ -5670,6 +6710,22 @@ $Data/Context/Context/DataItem/EventDescription$
 Count: $Data/Context/Count$
 Time Window Start: $Data/Context/TimeWindowStart$
 Time Window End: $Data/Context/TimeWindowEnd$</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor">
+          <Name>Proactive Microsoft Windows 2016 AutomaticServices Monitor</Name>
+          <Description></Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor" SubElementID="GoodCondition">
+          <Name>Good Condition</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor" SubElementID="BadCondition">
+          <Name>Bad Condition</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.AlertMessage">
+          <Name>Proactive Microsoft Windows 2016 AutomaticServices Monitor: Failure</Name>
+          <Description>Proactive Microsoft Windows 2016 AutomaticServices Monitor: detected a bad condition
+Summary:
+{1}</Description>
         </DisplayString>
 
         <DisplayString ElementID="Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery">
