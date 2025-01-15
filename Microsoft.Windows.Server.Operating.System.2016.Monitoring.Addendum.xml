@@ -2,13 +2,13 @@
   <Manifest>
     <Identity>
       <ID>Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum</ID>
-      <Version>1.0.6.2</Version>
+      <Version>1.0.7.6</Version>
     </Identity>
     <Name>Microsoft Windows Server Operating System 2016 Monitoring Addendum</Name>
     <References>
-      <Reference Alias="Windows">
-        <ID>Microsoft.Windows.Library</ID>
-        <Version>7.5.8501.0</Version>
+      <Reference Alias="Health">
+        <ID>System.Health.Library</ID>
+        <Version>7.0.8433.0</Version>
         <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
       </Reference>
       <Reference Alias="MWSL">
@@ -16,13 +16,13 @@
         <Version>10.0.0.0</Version>
         <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
       </Reference>
-      <Reference Alias="System">
-        <ID>System.Library</ID>
-        <Version>7.5.8501.0</Version>
-        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
-      </Reference>
       <Reference Alias="MWS6D">
         <ID>Microsoft.Windows.Server.2016.Discovery</ID>
+        <Version>10.0.0.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="MWS6M">
+        <ID>Microsoft.Windows.Server.2016.Monitoring</ID>
         <Version>10.0.0.0</Version>
         <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
       </Reference>
@@ -31,21 +31,21 @@
         <Version>7.0.8433.0</Version>
         <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
       </Reference>
-      <Reference Alias="MWS6M">
-        <ID>Microsoft.Windows.Server.2016.Monitoring</ID>
-        <Version>10.0.0.0</Version>
+      <Reference Alias="System">
+        <ID>System.Library</ID>
+        <Version>7.5.8501.0</Version>
         <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
       </Reference>
-      <Reference Alias="Health">
-        <ID>System.Health.Library</ID>
-        <Version>7.0.8433.0</Version>
+      <Reference Alias="Windows">
+        <ID>Microsoft.Windows.Library</ID>
+        <Version>7.5.8501.0</Version>
         <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
       </Reference>
     </References>
   </Manifest>
   <TypeDefinitions>
     <ModuleTypes>
-      <DataSourceModuleType ID="Proactive.DailyTasks.WINOSAlerts.Close.Script.DataSource" Accessibility="Internal" Batching="false">
+      <DataSourceModuleType ID="Proactive.DailyTasks.WINOSAlerts.Close.Script.Alert.Rule.DataSource" Accessibility="Internal" Batching="false">
         <Configuration>
           <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
         </Configuration>
@@ -70,7 +70,7 @@
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1062.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1076.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather WINOS 2016+ alerts and close via on demand task
@@ -84,7 +84,7 @@
 #=================================================================================
 # Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1062.ps1"
+$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Datasource.v1076.ps1"
 $EventID = "580"
 #=================================================================================
 
@@ -376,7 +376,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Script Completed. `n Script
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1062.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1076.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup
@@ -400,7 +400,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1062.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Monitor.Datasource.v1076.ps1"
 $EventID = "585"
 #=================================================================================
 
@@ -669,7 +669,7 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 	#	# Deletion task 
 	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#	}
-
+c:\\windows\\PSLogs
 	#if ( Test-Path C:\inetpub\logs\LogFiles\W3SVC2 )
 	#	{
 	#	# Years older than 
@@ -680,6 +680,22 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 	#	# Deletion task 
 	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#	}
+
+	# Cleanup PowerShell transcription log files for STIG V-230220
+	#=====================
+	$BackupFolder = "c:\windows\PSLogs"
+	if ( Test-Path $BackupFolder )
+		{ 
+		$Date = Get-date
+		$DaysToDelete = "5"
+		$NewDate = ($Date).AddDays(-$DaysToDelete)
+ 
+		$Files = Get-ChildItem -Path $BackupFolder -Directory | Where-Object {($_.CreationTime -lt $Newdate)}
+		ForEach ($File in $Files)
+			{
+			remove-item -Path $file.fullname -Recurse -force -verbose
+			}
+		}
 
 	# D drive Event cleanup
 	#$DeviceDriveLetter
@@ -911,7 +927,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1062.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1076.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather GroupPolicyReport alerts and close via on demand task
@@ -925,7 +941,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
 #=================================================================================
 # Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1062.ps1"
+$ScriptName = "Proactive.DailyTasks.GroupPolicy.2016.Report.Script.Alert.DataSource.v1076.ps1"
 $EventID = "582"
 #=================================================================================
 
@@ -1152,7 +1168,7 @@ if ( $GroupPolicyAlerts.Count -gt 0 )
 $GroupPolicyTeamReport
 
 
-$GroupPolicyTeamReport = $ADDSTeamReport | out-string
+$GroupPolicyTeamReport = $GroupPolicyTeamReport | out-string
 
 #============================================================
 
@@ -1218,7 +1234,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-          <ScriptName>Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1062.ps1</ScriptName>
+          <ScriptName>Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1076.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Script to check event log size, retention, and overwrite properties WHEN alert cuts for Event Log is full
@@ -1232,7 +1248,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1062.ps1"
+$ScriptName = "Microsoft.Windows.2016.Eventlog.Full.Script.DataSource.v1076.ps1"
 $EventID = "3750"
 #=================================================================================
 
@@ -1394,7 +1410,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
                 </Scheduler>
               </DataSource>
               <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
-                <ScriptName>Proactive.Microsoft.Windows.2016.AutomaticServices.DS.v1062.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.2016.AutomaticServices.DS.v1076.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to check automatic services
@@ -1408,7 +1424,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Proactive.Microsoft.Windows.2016.AutomaticServices.DataSource.v1062.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.2016.AutomaticServices.DataSource.v1076.ps1"
 $GEventID = "583"
 #=================================================================================
 
@@ -1452,7 +1468,9 @@ $NOTRunningServices = $AutoServices | where { ( $_.Status -ne 'Running' ) }
 $ExcludedServices = @('Software Protection','SMS_BOOTSTRAP','McAfee Audit Manager Service' `
 	,'McAfee Temporary Installer Service','Remote Registry','Google Update Service (gupdate)','GISvc' `
 	,'Downloaded Maps Manager','McAfee Endpoint Security Web Control Service','IP Helper' `
-	,'Windows Biometric Service' )
+	,'Windows Biometric Service','Connected Devices Platform Service','Windows Time' `
+	,'Windows Modules Installer','Windows Font Cache Service','Network Store Interface Service' `
+	,'Microsoft Edge Update Service (edgeupdate)','COM+ Event System','Windows Defender Advanced Threat Protection Service (Sense)' )
 
 # Debug
 # $ExcludedServices
@@ -1482,7 +1500,7 @@ $ServiceRestartingDetails = @()
 if ( $Remainder.Count -gt 0 )
 	{
 	# write-host "Restart any automatic startType services"
-	$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Begin Restart any automatic startType services. `n Service: ($ServiceName) is starting. `n Running as ($whoami).")
+	$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Begin Restart any automatic startType services. `n More than one (1) Service to be recovered.`n `nList of Remaining Automatic Services to be restarted: $($Remainder)")
 	#=================================================================================
 	
 	foreach ( $Service in $Remainder.Name )
@@ -1653,10 +1671,786 @@ $bag
 $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
 $momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
-write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime) seconds."
+#write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime) seconds."
 #=================================================================================
 # End of script
                 </ScriptBody>				
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+      <DataSourceModuleType ID="Proactive.DailyTasks.EnableTranscription.Report.Script.DataSource" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <WeeklySchedule>
+                    <Windows>
+                      <Daily>
+                        <Start>09:03</Start>
+                        <End>09:33</End>
+                        <DaysOfWeekMask>1</DaysOfWeekMask>
+                      </Daily>
+                    </Windows>
+                  </WeeklySchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
+                <ScriptName>Proactive.DailyTasks.EnableTranscription.Report.Script.DataSource.v1076.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Script to gather EnableTranscription alerts report script
+#
+#  Author: Kevin Justin
+#  v1.0
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.
+# ScriptName should be the same as the ID of the module that the script is contained in
+$ScriptName = "Proactive.DailyTasks.EnableTranscription.Report.Script.DataSource.v1076.ps1"
+$EventID = "615"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# PropertyBag Script section - Monitoring scripts get this
+#=================================================================================
+# Load SCOM PropertyBag function
+$bag = $momapi.CreatePropertyBag()
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#For a simple example - get files in Windows Temp:
+$date = get-date -uFormat "%Y-%m-%d"
+
+# Grab past week
+$Time = [DateTime](Get-Date).AddDays(-7)
+
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather EnableTranscription alerts for date ($date).")
+
+$Message = "Proactive EnableTranscription Daily Report for ($date)"
+  
+
+# Gather Enable Transcription update failed alerts
+# Monitors then rules
+$EnableTranscriptionAlerts = get-scomalert -name "*EnableTranscription*" | ? { ( $_.TimeRaised -ge $Time ) }
+#$EnableTranscriptionAlerts.Count
+$Test = $EnableTranscriptionAlerts.Count
+
+# Open EnableTranscription alerts
+$EnableTranscriptionOpenAlerts = $EnableTranscriptionAlerts	| ? { ( $_.ResolutionState -ne "255" ) }
+#$EnableTranscriptionOpenAlerts.Count
+
+# Open EnableTranscription alerts since last report
+$EnableTranscriptionAlertsSinceReport = $EnableTranscriptionAlerts | ? { ( $_.TimeRaised -ge $Time ) }
+#$EnableTranscriptionAlertsSinceReport.Count
+
+# Closed EnableTranscription alerts
+$ClosedEnableTranscriptionAlerts = $EnableTranscriptionAlerts | ? { ( $_.ResolutionState -eq "255" ) }
+#$ClosedEnableTranscriptionAlerts.Count
+
+
+# Build report
+$EnableTranscriptionTeamReport = @()
+
+# Check for alerts 
+if ( $EnableTranscriptionAlerts.Count -eq 0 )
+	{
+	$Message = "ZERO alerts for EnableTranscription Failure Daily report for ($date)"
+	$EnableTranscriptionTeamReport += "ZERO alerts for EnableTranscription report for ($date)"
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$Message")
+	}
+
+if ( $EnableTranscriptionAlerts.Count -gt 0 )
+	{
+	#
+	# Create table output
+
+	#
+	# Show ADDS alerts by Time Raised,NetBiosComputerName,Message
+	#
+	$EnableTranscriptionTeamReport += $Message
+	$EnableTranscriptionTeamReport += ""
+	$EnableTranscriptionTeamReport += "# EnableTranscription update failures Daily report for $($date)"
+	$EnableTranscriptionTeamReport += "#"
+	$EnableTranscriptionTeamReport += "# Alerts since last run = $($Test)"
+	$EnableTranscriptionTeamReport += "#"
+	$EnableTranscriptionTeamReport += "# Total OPEN alerts"
+	$EnableTranscriptionTeamReport += "#========================================================"
+	$EnableTranscriptionTeamReport += "# EnableTranscription alerts = $($EnableTranscriptionOpenAlerts.Count)"
+	$EnableTranscriptionTeamReport += ""
+	$EnableTranscriptionTeamReport += "# Total CLOSED alerts"
+	$EnableTranscriptionTeamReport += "#========================================================"	
+	$EnableTranscriptionTeamReport += "# EnableTranscription alerts = $($ClosedEnableTranscriptionAlerts.Count)"
+	$EnableTranscriptionTeamReport += "#========================================================"
+	$EnableTranscriptionTeamReport += ""
+
+
+	if ( $EnableTranscriptionOpenAlerts.count -eq 0 )
+		{
+		$EnableTranscriptionTeamReport += "ZERO Enable Transcription issues for ($date)."
+		$EnableTranscriptionTeamReport += ""
+		}
+
+	if ( $EnableTranscriptionOpenAlerts.count -gt 0 )
+		{
+		$EnableTranscriptionTeamReport += "# Resolve Open 'Enable Transcription' alert to satisfy Windows STIGS V-257502, V-257503"
+		$EnableTranscriptionTeamReport += "#============================================="
+		$EnableTranscriptionTeamReport += $EnableTranscriptionOpenAlerts | format-table TimeRaised,NetbiosComputername,Description -auto -wrap | out-string
+		$EnableTranscriptionTeamReport += "#============================================="
+		$EnableTranscriptionTeamReport += ""
+		$EnableTranscriptionTeamReport += "# Closed 'Enable Transcription' alert detail"
+		$EnableTranscriptionTeamReport += "#============================================="
+		$EnableTranscriptionTeamReport += $ClosedEnableTranscriptionAlerts | sort -property NetbiosComputerName -uniq | format-table NetbiosComputername,Description -auto -wrap | out-string
+		$EnableTranscriptionTeamReport += "#============================================="
+		$EnableTranscriptionTeamReport += ""
+		}
+	}
+
+#$EnableTranscriptionTeamReport
+
+# Format to string
+$EnableTranscriptionTeamReport = $EnableTranscriptionTeamReport | out-string
+
+#============================================================
+
+$Result = "GOOD"
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"$EnableTranscriptionTeamReport")
+
+#$bag.AddValue('Result',$Result)
+$bag.AddValue('Count',$Test)
+$bag.AddValue('Message',$Message)
+$bag.AddValue('Summary',$EnableTranscriptionTeamReport)
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+      <DataSourceModuleType ID="Proactive.DailyTasks.EnableTranscription.Close.Script.DataSource" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <WeeklySchedule>
+                    <Windows>
+                      <Daily>
+                        <Start>06:09</Start>
+                        <End>06:29</End>
+                        <DaysOfWeekMask>62</DaysOfWeekMask>
+                      </Daily>
+                    </Windows>
+                  </WeeklySchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
+                <ScriptName>Proactive.DailyTasks.EnableTranscription.Close.Script.DataSource.v1076.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Script to close EnableTranscription alerts cleanup script
+#
+#  Author: Kevin Justin
+#  v1.0
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.
+# ScriptName should be the same as the ID of the module that the script is contained in
+$ScriptName = "Proactive.DailyTasks.EnableTranscription.Close.Script.DataSource.v1076.ps1"
+$EventID = "616"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"EnableTranscription alerts cleanup Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# PropertyBag Script section - Monitoring scripts get this
+#=================================================================================
+# Load SCOM PropertyBag function
+$bag = $momapi.CreatePropertyBag()
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#For a simple example - get files in Windows Temp:
+$date = get-date -uFormat "%Y-%m-%d"
+
+# Grab past week
+$Time = [DateTime](Get-Date).AddDays(-7)
+$Age = [DateTime](Get-Date).AddDays(-1)
+
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather EnableTranscription alerts to close for date ($date).")
+
+$Message = "Proactive DailyTasks EnableTranscription Close Alert Report for ($date)"
+
+# Cleanup old monitors, more than a week old
+#=================================================================================
+
+
+# Gather EnableTranscription alerts
+## Grab the MP, get the Monitors and Rules from the MP, then grab all alerts found inside the Monitors/Rules
+$SCOMCoreMP = Get-SCOMManagementPack -DisplayName "Microsoft Windows Server Operating System 2016+ Monitoring Addendum"
+
+$SCOMCoreRules = $SCOMCoreMP.GetRules()
+$SCOMCoreMonitors = $SCOMCoreMP.GetMonitors()
+
+$SCOMCoreReportAlerts = Get-SCOMAlert -ResolutionState (0..254) | ? { ($_.Name -in $SCOMCoreRules.DisplayName) -or ($_.Name -in $SCOMCoreMonitors.DisplayName) }
+$SCOMCoreReportAlerts.Count
+
+$SCOMCoreRuleAlerts = $SCOMCoreReportAlerts | ? { ( $_.Name -in $SCOMCoreRules.DisplayName) }
+$SCOMCoreRuleAlerts.Count
+
+
+# EnableTranscription Monitor reset
+$EnableTranscriptionMonitor = $SCOMCoreMonitors | where { $_.DisplayName -like "*EnableTranscription*" }
+
+
+# Look for EnableTranscription (unhealthy monitors, open rule) alerts
+if ( $EnableTranscriptionAlerts.Count -gt 0 )
+	{
+	# Debug	
+	#$EnableTranscriptionMonitor
+
+	# Set up monitor objects to reset
+	# $Class = Get-SCOMClass -Name "Microsoft.Windows.Server.10.0.OperatingSystem"
+	foreach ($MonitorDisplayName in $EnableTranscriptionMonitor)
+		{
+		$Monitors = @(Get-SCOMMonitor -displayname $MonitorDisplayName)
+
+		# Set up monitor objects to reset
+		foreach ($Monitor in $Monitors)
+			{
+			$MonitorClass = Get-SCOMClass -Id $Monitor.Target.Id
+			$ActiveMonitors = Get-SCOMClassInstance -Class $MonitorClass | ? { ($_.healthstate -ne 'Success') -AND ( $_.healthstate -ne 'Uninitialized') -AND ($_.IsAvailable -eq $true) }
+			write-host "Found" + $ActiveMonitors.Count + "active monitors."
+			foreach ( $UnhealthyOLDMonitor in $ActiveMonitors )
+				{
+				#if ( $UnhealthyOLDMonitor.AvailabilityLastModified -lt $Age )
+				if ( $UnhealthyOLDMonitor.StateLastModified -lt $Age )
+					{
+					foreach ( $ActiveMonitor in $UnhealthyOLDMonitor )
+						{
+						# Debug
+						$ActiveMonitor.ID
+						write-host " Resetting Health State on '" + $ActiveMonitor.FullName + "'" 
+						write-host ""
+						$ActiveMonitor.ResetMonitoringState($ActiveMonitor.ID)
+						}
+					}
+				}
+			}
+		}
+	# Debug
+	#$MonitorClass | fl -property *
+	#$MonitorClass | select DisplayName,ID
+	}
+
+
+# Debug Write event for summary report
+#=================================================================================
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"EnableTranscription Monitor reset completed for ($date)")
+
+
+
+# Rule closure logic
+#=================================================================================
+$SCOMCoreRulesToClear = $SCOMCoreRuleAlerts
+	# | where { ( $_.TimeAdded -lt $Age ) }
+	# Convert Age back to days for alert properties logging
+	# $Days = ((Get-date) - $Age).Days
+
+if ( $SCOMCoreRulesToClear.Count -gt 0 )
+	{
+	$SCOMCoreRulesToClear | Resolve-SCOMAlert -Comment "Closing open alerts after report alert generated - OS Addendum EnableTranscription Close Automation DS"
+	}
+
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Proactive DailyTasks EnableTranscription Close reset unhealthy monitors completed for ($date)")
+
+
+
+
+
+# Create report to gather Enable Transcription update failed alerts - Close Monitors then rules
+$EnableTranscriptionAlerts = $SCOMCoreReportAlerts | where { ( $_.TimeRaised -ge $Time ) }
+$EnableTranscriptionAlerts.Count
+
+# Open EnableTranscription alerts
+$EnableTranscriptionOpenAlerts = $EnableTranscriptionAlerts	| where { ( $_.ResolutionState -ne "255" ) }
+$EnableTranscriptionOpenAlerts.Count
+
+# Open EnableTranscription alerts since last report
+$EnableTranscriptionAlertsSinceReport = $EnableTranscriptionAlerts | where { ( $_.TimeRaised -ge $Time ) }
+$EnableTranscriptionAlertsSinceReport.Count
+
+# Closed EnableTranscription alerts
+$ClosedEnableTranscriptionAlerts = $EnableTranscriptionAlerts | where { ( $_.ResolutionState -eq "255" ) }
+$ClosedEnableTranscriptionAlerts.Count
+
+
+# Build report
+$EnableTranscriptionTeamReport = @()
+
+# Check for alerts 
+if ( $EnableTranscriptionAlerts.Count -eq 0 )
+	{
+	$Message = "ZERO alerts for EnableTranscription Failure Daily report for ($date)"
+	$EnableTranscriptionTeamReport += "ZERO alerts for EnableTranscription Close report for ($date)"
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$Message")
+	}
+
+if ( $EnableTranscriptionAlerts.Count -gt 0 )
+	{
+	#
+	# Create table output
+
+	#
+	# Show ADDS alerts by Time Raised,NetBiosComputerName,Message
+	#
+	$EnableTranscriptionTeamReport += $Message
+	$EnableTranscriptionTeamReport += ""
+	$EnableTranscriptionTeamReport += "# EnableTranscription Close Alert Report for $($date)"
+	$EnableTranscriptionTeamReport += "#"
+	$EnableTranscriptionTeamReport += "# Alerts since last run = $($EnableTranscriptionAlertsSinceReport.Count)"
+	$EnableTranscriptionTeamReport += "#"
+	$EnableTranscriptionTeamReport += "# Total OPEN alerts"
+	$EnableTranscriptionTeamReport += "#========================================================"
+	$EnableTranscriptionTeamReport += "# EnableTranscription alerts = $($EnableTranscriptionOpenAlerts.Count)"
+	$EnableTranscriptionTeamReport += ""
+	$EnableTranscriptionTeamReport += "# Total CLOSED alerts"
+	$EnableTranscriptionTeamReport += "#========================================================"	
+	$EnableTranscriptionTeamReport += "# EnableTranscription alerts = $($ClosedEnableTranscriptionAlerts.Count)"
+	$EnableTranscriptionTeamReport += "#========================================================"
+	$EnableTranscriptionTeamReport += ""
+	}
+
+#$EnableTranscriptionTeamReport
+
+# Format to string
+$EnableTranscriptionTeamReport = $EnableTranscriptionTeamReport | out-string
+
+
+#============================================================
+
+$Result = "GOOD"
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"$EnableTranscriptionTeamReport")
+
+#$bag.AddValue('Result',$Result)
+$bag.AddValue('Count',$Test)
+$bag.AddValue('Message',$Message)
+$bag.AddValue('Summary',$EnableTranscriptionTeamReport)
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+      <DataSourceModuleType ID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.DataSource" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <WeeklySchedule>
+                    <Windows>
+                      <Daily>
+                        <Start>09:13</Start>
+                        <End>09:43</End>
+                        <DaysOfWeekMask>1</DaysOfWeekMask>
+                      </Daily>
+                    </Windows>
+                  </WeeklySchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
+                <ScriptName>Proactive.DailyTasks.EnableTranscription.Close.Script.DataSource.v1076.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Proactive Enable Transcription LogCleanup workflow to clean up PowerShell transcription logs
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.  
+$ScriptName = "Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.DataSource.v1076.ps1"
+$EventID = "617"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+# Load PropertyBag function 
+$bag = $momapi.CreatePropertyBag()
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n EnableTranscription LogCleanup Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+$date = get-date -uFormat "%Y-%m-%d"
+
+$Message = "Proactive DailyTasks EnableTranscription LogCleanup Script Report for ($date)"
+
+# Cleanup PowerShell transcription log files for STIG V-230220
+#=====================
+$BackupFolder = "C:\Windows\PSLogs"
+if ( Test-Path $BackupFolder )
+	{ 
+	$Age = Get-date
+	$DaysToDelete = "5"
+	$NewDate = ($Age).AddDays(-$DaysToDelete)
+
+	$Files = Get-ChildItem -Path $BackupFolder -Directory | Where-Object {($_.CreationTime -lt $Newdate)}
+	ForEach ($File in $Files)
+		{
+		remove-item -Path $file.fullname -Recurse -force -verbose
+		}
+	}
+
+
+# Build report
+$EnableTranscriptionLogCleanup = @()
+
+# Check for alerts 
+if ( $Files.Count -eq 0 )
+	{
+	$Message = "ZERO alerts for EnableTranscription LogCleanup report for ($date)"
+	$EnableTranscriptionLogCleanup += "ZERO alerts for EnableTranscription LogCleanup report for ($date)"
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$Message")
+	}
+
+if ( $Files.Count -gt 0 )
+	{
+	#
+	# Create table output
+
+	#
+	# Show ADDS alerts by Time Raised,NetBiosComputerName,Message
+	#
+	$EnableTranscriptionLogCleanup += $Message
+	$EnableTranscriptionLogCleanup += ""
+	$EnableTranscriptionLogCleanup += "# EnableTranscription LogCleanup Daily report for $($date)"
+	$EnableTranscriptionLogCleanup += "#"
+	$EnableTranscriptionLogCleanup += "# Total Files found"
+	$EnableTranscriptionLogCleanup += "#========================================================"
+	$EnableTranscriptionLogCleanup += "# EnableTranscription Files found = $($Files.Count)"
+	$EnableTranscriptionLogCleanup += ""
+	$EnableTranscriptionLogCleanup += "# Total Files found details"
+	$EnableTranscriptionLogCleanup += "#========================================================"	
+	$EnableTranscriptionLogCleanup += "$($Files)"
+	$EnableTranscriptionLogCleanup += "#========================================================"
+	$EnableTranscriptionLogCleanup += ""
+	}
+
+#$EnableTranscriptionLogCleanup
+
+# Format to string
+$EnableTranscriptionLogCleanup = $EnableTranscriptionLogCleanup | out-string
+
+
+#============================================================
+
+$Result = "GOOD"
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"$EnableTranscriptionLogCleanup")
+
+#$bag.AddValue('Result',$Result)
+$bag.AddValue('Count',$Test)
+$bag.AddValue('Message',$Message)
+$bag.AddValue('Summary',$EnableTranscriptionLogCleanup)
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"EnableTranscription LogCleanup Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PA">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+      <DataSourceModuleType ID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Monitor.DataSource" Accessibility="Internal" Batching="false">
+        <Configuration>
+		  <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />	
+        </Configuration>
+        <OverrideableParameters>
+		  <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+		  <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Scheduler">
+                <Scheduler>
+                  <SimpleReccuringSchedule>
+                    <Interval Unit="Seconds">$Config/IntervalSeconds$</Interval>
+					<SyncTime>$Config/SyncTime$</SyncTime>
+                  </SimpleReccuringSchedule>
+                  <ExcludeDates />
+                </Scheduler>
+              </DataSource>
+              <ProbeAction ID="PA" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
+                <ScriptName>Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Monitor.DataSource.v1076.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Proactive Enable Transcription LogCleanup workflow to clean up PowerShell transcription logs
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.  
+$ScriptName = "Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Monitor.DataSource.v1076.ps1"
+$EventID = "617"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+# Load PropertyBag function 
+$bag = $momapi.CreatePropertyBag()
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n EnableTranscription LogCleanup Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+$date = get-date -uFormat "%Y-%m-%d"
+
+$Message = "Proactive DailyTasks EnableTranscription LogCleanup Script Report for ($date)"
+
+# Cleanup PowerShell transcription log files for STIG V-230220
+#=====================
+$BackupFolder = "C:\Windows\PSLogs"
+if ( Test-Path $BackupFolder )
+	{ 
+	$Age = Get-date
+	$DaysToDelete = "5"
+	$NewDate = ($Age).AddDays(-$DaysToDelete)
+
+	$Files = Get-ChildItem -Path $BackupFolder -Directory | Where-Object {($_.CreationTime -lt $Newdate)}
+	ForEach ($File in $Files)
+		{
+		remove-item -Path $file.fullname -Recurse -force -verbose
+		}
+	}
+
+
+# Build report
+$EnableTranscriptionLogCleanup = @()
+
+# Check for alerts 
+if ( $Files.Count -eq 0 )
+	{
+	$Message = "ZERO alerts for EnableTranscription LogCleanup report for ($date)"
+	$EnableTranscriptionLogCleanup += "ZERO alerts for EnableTranscription LogCleanup report for ($date)"
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$Message")
+	}
+
+if ( $Files.Count -gt 0 )
+	{
+	#
+	# Create table output
+
+	#
+	# Show ADDS alerts by Time Raised,NetBiosComputerName,Message
+	#
+	$EnableTranscriptionLogCleanup += $Message
+	$EnableTranscriptionLogCleanup += ""
+	$EnableTranscriptionLogCleanup += "# EnableTranscription LogCleanup Daily report for $($date)"
+	$EnableTranscriptionLogCleanup += "#"
+	$EnableTranscriptionLogCleanup += "# Total Files found"
+	$EnableTranscriptionLogCleanup += "#========================================================"
+	$EnableTranscriptionLogCleanup += "# EnableTranscription Files found = $($Files.Count)"
+	$EnableTranscriptionLogCleanup += ""
+	$EnableTranscriptionLogCleanup += "# Total Files found details"
+	$EnableTranscriptionLogCleanup += "#========================================================"	
+	$EnableTranscriptionLogCleanup += "$($Files)"
+	$EnableTranscriptionLogCleanup += "#========================================================"
+	$EnableTranscriptionLogCleanup += ""
+	}
+
+#$EnableTranscriptionLogCleanup
+
+# Format to string
+$EnableTranscriptionLogCleanup = $EnableTranscriptionLogCleanup | out-string
+
+
+#============================================================
+
+$Result = "GOOD"
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"$EnableTranscriptionLogCleanup")
+
+#$bag.AddValue('Result',$Result)
+$bag.AddValue('Count',$Test)
+$bag.AddValue('Message',$Message)
+$bag.AddValue('Summary',$EnableTranscriptionLogCleanup)
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"EnableTranscription LogCleanup Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
                 <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
               </ProbeAction>
             </MemberModules>
@@ -1681,7 +2475,7 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1062.ps1</ScriptName>
+                <ScriptName>Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1076.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to gather WINOS 2012 alerts and close via on demand task
@@ -1695,7 +2489,7 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
 #=================================================================================
 # Assign script name variable for use in event logging.
 # ScriptName should be the same as the ID of the module that the script is contained in
-$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1062.ps1"
+$ScriptName = "Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA.v1076.ps1"
 $EventID = "581"
 #=================================================================================
 
@@ -1956,7 +2750,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Script Completed. `n Script
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1062.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1076.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Proactive 2016+ logical disk cleanup manual task
@@ -1975,7 +2769,7 @@ $ComputerName = $env:ComputerName
 #$DriveLetter = "C"
 $DriveLetter
 #=================================================================================
-$ScriptName = "Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1062.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.2016.LogicalDisk.Cleanup.WA.v1076.ps1"
 $EventID = "586"
 #=================================================================================
 
@@ -2256,6 +3050,22 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 		# get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 		# }
 
+	# Cleanup PowerShell transcription log files for STIG V-230220
+	#=====================
+	$BackupFolder = "c:\windows\PSLogs"
+	if ( Test-Path $BackupFolder )
+		{ 
+		$Date = Get-date
+		$DaysToDelete = "5"
+		$NewDate = ($Date).AddDays(-$DaysToDelete)
+ 
+		$Files = Get-ChildItem -Path $BackupFolder -Directory | Where-Object {($_.CreationTime -lt $Newdate)}
+		ForEach ($File in $Files)
+			{
+			remove-item -Path $file.fullname -Recurse -force -verbose
+			}
+		}
+
 	# # D drive Event cleanup
 	# $DeviceDriveLetter
 	# If ( $DeviceDriveLetter -eq "D:" )
@@ -2465,7 +3275,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Microsoft.Windows.Server.2016.Eventlog.Service.WA.v1062.ps1</ScriptName>
+                <ScriptName>Microsoft.Windows.Server.2016.Eventlog.Service.WA.v1076.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to restart a service
@@ -2486,7 +3296,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runti
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1062.ps1"
+$ScriptName = "Microsoft.Windows.Eventlog.Service.Monitor.Recovery.v1076.ps1"
 $EventID = "3750"
 #=================================================================================
 
@@ -2623,7 +3433,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
           <Composite>
             <MemberModules>
               <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-                <ScriptName>Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule.WA.v1062.ps1</ScriptName>
+                <ScriptName>Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule.WA.v1076.ps1</ScriptName>
                 <ScriptBody>
 #=================================================================================
 #  Script to check automatic services hourly WA rule
@@ -2637,7 +3447,7 @@ write-host "Script Completed. Script Runtime: ($ScriptTime) seconds."
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging
-$ScriptName = "Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule.WA.v1062.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Rule.WA.v1076.ps1"
 $GEventID = "584"
 #=================================================================================
 
@@ -2663,7 +3473,7 @@ $bag = $momapi.CreatePropertyBag()
 $date = get-date -uFormat "%Y-%m-%d %H%M"
 $Age = [DateTime](Get-Date).AddMinutes(-5)
 
-$Message = "Automatic Services - Monitor, run @ $date"
+$Message = "Automatic Services - Hourly rule, run @ $date"
 
 # WMI method
 # gwmi Win32_Service | where { ( $_.StartMode = 'Auto' ) AND ( $_.State != 'Running' )  }
@@ -2681,7 +3491,9 @@ $NOTRunningServices = $AutoServices | where { ( $_.Status -ne 'Running' ) }
 $ExcludedServices = @('Software Protection','SMS_BOOTSTRAP','McAfee Audit Manager Service' `
 	,'McAfee Temporary Installer Service','Remote Registry','Google Update Service (gupdate)','GISvc' `
 	,'Downloaded Maps Manager','McAfee Endpoint Security Web Control Service','IP Helper' `
-	,'Windows Biometric Service' )
+	,'Windows Biometric Service','Connected Devices Platform Service','Windows Time' `
+	,'Windows Modules Installer','Windows Font Cache Service','Network Store Interface Service' `
+	,'Microsoft Edge Update Service (edgeupdate)','COM+ Event System','Windows Defender Advanced Threat Protection Service (Sense)' )
 
 # Debug
 # $ExcludedServices
@@ -2711,7 +3523,7 @@ $ServiceRestartingDetails = @()
 if ( $Remainder.Count -gt 0 )
 	{
 	# write-host "Restart any automatic startType services"
-	$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Begin Restart any automatic startType services. `n Service: ($ServiceName) is starting. `n Running as ($whoami).")
+	$momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Begin Restart any automatic startType services. `n More than one (1) Service to be recovered.`n `nList of Remaining Automatic Services to be restarted: $($Remainder)")
 	#=================================================================================
 	
 	foreach ( $Service in $Remainder.Name )
@@ -2883,6 +3695,579 @@ $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
 $momapi.LogScriptEvent($ScriptName,$GEventID,0,"Automatic Services - Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime) seconds."
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </WriteAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PSWA" />
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.BaseData</OutputType>
+        <InputType>System!System.BaseData</InputType>
+      </WriteActionModuleType>
+      <WriteActionModuleType ID="Proactive.DailyTasks.EnableTranscription.Report.Script.WA" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" name="TimeoutSeconds" type="xsd:integer" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
+                <ScriptName>Proactive.DailyTasks.EnableTranscription.Report.Script.WA.v1076.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Script to gather EnableTranscription alerts report script WA task
+#
+#  Author: Kevin Justin
+#  v1.0
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.
+# ScriptName should be the same as the ID of the module that the script is contained in
+$ScriptName = "Proactive.DailyTasks.EnableTranscription.Report.Script.DataSource.v1076.ps1"
+$EventID = "618"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# PropertyBag Script section - Monitoring scripts get this
+#=================================================================================
+# Load SCOM PropertyBag function
+$bag = $momapi.CreatePropertyBag()
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#For a simple example - get files in Windows Temp:
+$date = get-date -uFormat "%Y-%m-%d"
+
+# Grab past week
+$Time = [DateTime](Get-Date).AddDays(-7)
+
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather EnableTranscription alerts for date ($date).")
+
+$Message = "Proactive EnableTranscription Daily Report for ($date)"
+  
+
+# Gather Enable Transcription update failed alerts
+# Monitors then rules
+$EnableTranscriptionAlerts = get-scomalert -name "*EnableTranscription*" | ? { ( $_.TimeRaised -ge $Time ) }
+#$EnableTranscriptionAlerts.Count
+$Test = $EnableTranscriptionAlerts.Count
+
+# Open EnableTranscription alerts
+$EnableTranscriptionOpenAlerts = $EnableTranscriptionAlerts	| ? { ( $_.ResolutionState -ne "255" ) }
+#$EnableTranscriptionOpenAlerts.Count
+
+# Open EnableTranscription alerts since last report
+$EnableTranscriptionAlertsSinceReport = $EnableTranscriptionAlerts | ? { ( $_.TimeRaised -ge $Time ) }
+#$EnableTranscriptionAlertsSinceReport.Count
+
+# Closed EnableTranscription alerts
+$ClosedEnableTranscriptionAlerts = $EnableTranscriptionAlerts | ? { ( $_.ResolutionState -eq "255" ) }
+#$ClosedEnableTranscriptionAlerts.Count
+
+
+# Build report
+$EnableTranscriptionTeamReport = @()
+
+# Check for alerts 
+if ( $EnableTranscriptionAlerts.Count -eq 0 )
+	{
+	$Message = "ZERO alerts for EnableTranscription Failure Daily report for ($date)"
+	$EnableTranscriptionTeamReport += "ZERO alerts for EnableTranscription report for ($date)"
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$Message")
+	}
+
+if ( $EnableTranscriptionAlerts.Count -gt 0 )
+	{
+	#
+	# Create table output
+
+	#
+	# Show ADDS alerts by Time Raised,NetBiosComputerName,Message
+	#
+	$EnableTranscriptionTeamReport += $Message
+	$EnableTranscriptionTeamReport += ""
+	$EnableTranscriptionTeamReport += "# EnableTranscription update failures Daily report for $($date)"
+	$EnableTranscriptionTeamReport += "#"
+	$EnableTranscriptionTeamReport += "# Alerts since last run = $($Test)"
+	$EnableTranscriptionTeamReport += "#"
+	$EnableTranscriptionTeamReport += "# Total OPEN alerts"
+	$EnableTranscriptionTeamReport += "#========================================================"
+	$EnableTranscriptionTeamReport += "# EnableTranscription alerts = $($EnableTranscriptionOpenAlerts.Count)"
+	$EnableTranscriptionTeamReport += ""
+	$EnableTranscriptionTeamReport += "# Total CLOSED alerts"
+	$EnableTranscriptionTeamReport += "#========================================================"	
+	$EnableTranscriptionTeamReport += "# EnableTranscription alerts = $($ClosedEnableTranscriptionAlerts.Count)"
+	$EnableTranscriptionTeamReport += "#========================================================"
+	$EnableTranscriptionTeamReport += ""
+
+
+	if ( $EnableTranscriptionOpenAlerts.count -eq 0 )
+		{
+		$EnableTranscriptionTeamReport += "ZERO Enable Transcription issues for ($date)."
+		$EnableTranscriptionTeamReport += ""
+		}
+
+	if ( $EnableTranscriptionOpenAlerts.count -gt 0 )
+		{
+		$EnableTranscriptionTeamReport += "# Resolve Open 'Enable Transcription' alert to satisfy Windows STIGS V-257502, V-257503"
+		$EnableTranscriptionTeamReport += "#============================================="
+		$EnableTranscriptionTeamReport += $EnableTranscriptionOpenAlerts | format-table TimeRaised,NetbiosComputername,Description -auto -wrap | out-string
+		$EnableTranscriptionTeamReport += "#============================================="
+		$EnableTranscriptionTeamReport += ""
+		$EnableTranscriptionTeamReport += "# Closed 'Enable Transcription' alert detail"
+		$EnableTranscriptionTeamReport += "#============================================="
+		$EnableTranscriptionTeamReport += $ClosedEnableTranscriptionAlerts | sort -property NetbiosComputerName -uniq | format-table NetbiosComputername,Description -auto -wrap | out-string
+		$EnableTranscriptionTeamReport += "#============================================="
+		$EnableTranscriptionTeamReport += ""
+		}
+	}
+
+#$EnableTranscriptionTeamReport
+
+# Format to string
+$EnableTranscriptionTeamReport = $EnableTranscriptionTeamReport | out-string
+
+#============================================================
+
+$Result = "GOOD"
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"$EnableTranscriptionTeamReport")
+
+#$bag.AddValue('Result',$Result)
+$bag.AddValue('Count',$Test)
+$bag.AddValue('Message',$Message)
+$bag.AddValue('Summary',$EnableTranscriptionTeamReport)
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </WriteAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PSWA" />
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.BaseData</OutputType>
+        <InputType>System!System.BaseData</InputType>
+      </WriteActionModuleType>
+      <WriteActionModuleType ID="Proactive.DailyTasks.EnableTranscription.Close.Script.WA" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" name="TimeoutSeconds" type="xsd:integer" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
+                <ScriptName>Proactive.DailyTasks.EnableTranscription.Close.Script.WA.v1076.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Script to close EnableTranscription alerts cleanup script
+#
+#  Author: Kevin Justin
+#  v1.0
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.
+# ScriptName should be the same as the ID of the module that the script is contained in
+$ScriptName = "Proactive.DailyTasks.EnableTranscription.Close.Script.WA.v1076.ps1"
+$EventID = "619"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"EnableTranscription alerts cleanup Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# PropertyBag Script section - Monitoring scripts get this
+#=================================================================================
+# Load SCOM PropertyBag function
+$bag = $momapi.CreatePropertyBag()
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+#For a simple example - get files in Windows Temp:
+$date = get-date -uFormat "%Y-%m-%d"
+
+# Grab past week
+$Time = [DateTime](Get-Date).AddDays(-7)
+$Age = [DateTime](Get-Date).AddDays(-1)
+
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Gather EnableTranscription alerts to close for date ($date).")
+
+$Message = "Proactive DailyTasks EnableTranscription Close Alert Report for ($date)"
+
+# Cleanup old monitors, more than a week old
+#=================================================================================
+
+
+# Gather EnableTranscription alerts
+## Grab the MP, get the Monitors and Rules from the MP, then grab all alerts found inside the Monitors/Rules
+$SCOMCoreMP = Get-SCOMManagementPack -DisplayName "Microsoft Windows Server Operating System 2016+ Monitoring Addendum"
+
+$SCOMCoreRules = $SCOMCoreMP.GetRules()
+$SCOMCoreMonitors = $SCOMCoreMP.GetMonitors()
+
+$SCOMCoreReportAlerts = Get-SCOMAlert -ResolutionState (0..254) | ? { ($_.Name -in $SCOMCoreRules.DisplayName) -or ($_.Name -in $SCOMCoreMonitors.DisplayName) }
+$SCOMCoreReportAlerts.Count
+
+$SCOMCoreRuleAlerts = $SCOMCoreReportAlerts | ? { ( $_.Name -in $SCOMCoreRules.DisplayName) }
+$SCOMCoreRuleAlerts.Count
+
+
+# EnableTranscription Monitor reset
+$EnableTranscriptionMonitor = $SCOMCoreMonitors | where { $_.DisplayName -like "*EnableTranscription*" }
+
+
+# Look for EnableTranscription (unhealthy monitors, open rule) alerts
+if ( $EnableTranscriptionAlerts.Count -gt 0 )
+	{
+	# Debug	
+	#$EnableTranscriptionMonitor
+
+	# Set up monitor objects to reset
+	# $Class = Get-SCOMClass -Name "Microsoft.Windows.Server.10.0.OperatingSystem"
+	foreach ($MonitorDisplayName in $EnableTranscriptionMonitor)
+		{
+		$Monitors = @(Get-SCOMMonitor -displayname $MonitorDisplayName)
+
+		# Set up monitor objects to reset
+		foreach ($Monitor in $Monitors)
+			{
+			$MonitorClass = Get-SCOMClass -Id $Monitor.Target.Id
+			$ActiveMonitors = Get-SCOMClassInstance -Class $MonitorClass | ? { ($_.healthstate -ne 'Success') -AND ( $_.healthstate -ne 'Uninitialized') -AND ($_.IsAvailable -eq $true) }
+			write-host "Found" + $ActiveMonitors.Count + "active monitors."
+			foreach ( $UnhealthyOLDMonitor in $ActiveMonitors )
+				{
+				#if ( $UnhealthyOLDMonitor.AvailabilityLastModified -lt $Age )
+				if ( $UnhealthyOLDMonitor.StateLastModified -lt $Age )
+					{
+					foreach ( $ActiveMonitor in $UnhealthyOLDMonitor )
+						{
+						# Debug
+						$ActiveMonitor.ID
+						write-host " Resetting Health State on '" + $ActiveMonitor.FullName + "'" 
+						write-host ""
+						$ActiveMonitor.ResetMonitoringState($ActiveMonitor.ID)
+						}
+					}
+				}
+			}
+		}
+	# Debug
+	#$MonitorClass | fl -property *
+	#$MonitorClass | select DisplayName,ID
+	}
+
+
+# Debug Write event for summary report
+#=================================================================================
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"EnableTranscription Monitor reset completed for ($date)")
+
+
+
+# Rule closure logic
+#=================================================================================
+$SCOMCoreRulesToClear = $SCOMCoreRuleAlerts
+	# | where { ( $_.TimeAdded -lt $Age ) }
+	# Convert Age back to days for alert properties logging
+	# $Days = ((Get-date) - $Age).Days
+
+if ( $SCOMCoreRulesToClear.Count -gt 0 )
+	{
+	$SCOMCoreRulesToClear | Resolve-SCOMAlert -Comment "Closing open alerts after report alert generated - OS Addendum EnableTranscription Close Automation DS"
+	}
+
+# Write event for rule closure
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Proactive DailyTasks EnableTranscription Close reset unhealthy monitors completed for ($date)")
+
+
+
+
+
+# Create report to gather Enable Transcription update failed alerts - Close Monitors then rules
+$EnableTranscriptionAlerts = $SCOMCoreReportAlerts | where { ( $_.TimeRaised -ge $Time ) }
+$EnableTranscriptionAlerts.Count
+
+# Open EnableTranscription alerts
+$EnableTranscriptionOpenAlerts = $EnableTranscriptionAlerts	| where { ( $_.ResolutionState -ne "255" ) }
+$EnableTranscriptionOpenAlerts.Count
+
+# Open EnableTranscription alerts since last report
+$EnableTranscriptionAlertsSinceReport = $EnableTranscriptionAlerts | where { ( $_.TimeRaised -ge $Time ) }
+$EnableTranscriptionAlertsSinceReport.Count
+
+# Closed EnableTranscription alerts
+$ClosedEnableTranscriptionAlerts = $EnableTranscriptionAlerts | where { ( $_.ResolutionState -eq "255" ) }
+$ClosedEnableTranscriptionAlerts.Count
+
+
+# Build report
+$EnableTranscriptionTeamReport = @()
+
+# Check for alerts 
+if ( $EnableTranscriptionAlerts.Count -eq 0 )
+	{
+	$Message = "ZERO alerts for EnableTranscription Failure Daily report for ($date)"
+	$EnableTranscriptionTeamReport += "ZERO alerts for EnableTranscription Close report for ($date)"
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$Message")
+	}
+
+if ( $EnableTranscriptionAlerts.Count -gt 0 )
+	{
+	#
+	# Create table output
+
+	#
+	# Show ADDS alerts by Time Raised,NetBiosComputerName,Message
+	#
+	$EnableTranscriptionTeamReport += $Message
+	$EnableTranscriptionTeamReport += ""
+	$EnableTranscriptionTeamReport += "# EnableTranscription Close Alert Report for $($date)"
+	$EnableTranscriptionTeamReport += "#"
+	$EnableTranscriptionTeamReport += "# Alerts since last run = $($EnableTranscriptionAlertsSinceReport.Count)"
+	$EnableTranscriptionTeamReport += "#"
+	$EnableTranscriptionTeamReport += "# Total OPEN alerts"
+	$EnableTranscriptionTeamReport += "#========================================================"
+	$EnableTranscriptionTeamReport += "# EnableTranscription alerts = $($EnableTranscriptionOpenAlerts.Count)"
+	$EnableTranscriptionTeamReport += ""
+	$EnableTranscriptionTeamReport += "# Total CLOSED alerts"
+	$EnableTranscriptionTeamReport += "#========================================================"	
+	$EnableTranscriptionTeamReport += "# EnableTranscription alerts = $($ClosedEnableTranscriptionAlerts.Count)"
+	$EnableTranscriptionTeamReport += "#========================================================"
+	$EnableTranscriptionTeamReport += ""
+	}
+
+#$EnableTranscriptionTeamReport
+
+# Format to string
+$EnableTranscriptionTeamReport = $EnableTranscriptionTeamReport | out-string
+
+
+#============================================================
+
+$Result = "GOOD"
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"$EnableTranscriptionTeamReport")
+
+#$bag.AddValue('Result',$Result)
+$bag.AddValue('Count',$Test)
+$bag.AddValue('Message',$Message)
+$bag.AddValue('Summary',$EnableTranscriptionTeamReport)
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+#=================================================================================
+# End of script
+                </ScriptBody>
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </WriteAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="PSWA" />
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.BaseData</OutputType>
+        <InputType>System!System.BaseData</InputType>
+      </WriteActionModuleType>
+      <WriteActionModuleType ID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.WA" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" name="TimeoutSeconds" type="xsd:integer" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
+                <ScriptName>Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.WA.v1076.ps1</ScriptName>
+                <ScriptBody>
+#=================================================================================
+#  Proactive Enable Transcription LogCleanup workflow to clean up PowerShell transcription logs
+#
+#  Author:  Kevin Justin
+#  v1.0
+#=================================================================================
+
+
+# Constants section - modify stuff here:
+#=================================================================================
+# Assign script name variable for use in event logging.  
+$ScriptName = "Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.WA.v1076.ps1"
+$EventID = "620"
+#=================================================================================
+
+
+# Starting Script section - All scripts get this
+#=================================================================================
+# Gather the start time of the script
+$StartTime = Get-Date
+#Set variable to be used in logging events
+$whoami = whoami
+# Load MOMScript API
+$momapi = New-Object -comObject MOM.ScriptAPI
+# Load PropertyBag function 
+$bag = $momapi.CreatePropertyBag()
+#Log script event that we are starting task
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n EnableTranscription LogCleanup Script is starting. `n Running as ($whoami).")
+#=================================================================================
+
+
+# Begin MAIN script section
+#=================================================================================
+$date = get-date -uFormat "%Y-%m-%d"
+
+$Message = "Proactive DailyTasks EnableTranscription LogCleanup Script Report for ($date)"
+
+# Cleanup PowerShell transcription log files for STIG V-230220
+#=====================
+$BackupFolder = "C:\Windows\PSLogs"
+if ( Test-Path $BackupFolder )
+	{ 
+	$Age = Get-date
+	$DaysToDelete = "5"
+	$NewDate = ($Age).AddDays(-$DaysToDelete)
+
+	$Files = Get-ChildItem -Path $BackupFolder -Directory | Where-Object {($_.CreationTime -lt $Newdate)}
+	ForEach ($File in $Files)
+		{
+		remove-item -Path $file.fullname -Recurse -force -verbose
+		}
+	}
+
+
+# Build report
+$EnableTranscriptionLogCleanup = @()
+
+# Check for alerts 
+if ( $Files.Count -eq 0 )
+	{
+	$Message = "ZERO alerts for EnableTranscription LogCleanup report for ($date)"
+	$EnableTranscriptionLogCleanup += "ZERO alerts for EnableTranscription LogCleanup report for ($date)"
+	$momapi.LogScriptEvent($ScriptName,$EventID,0,"$Message")
+	}
+
+if ( $Files.Count -gt 0 )
+	{
+	#
+	# Create table output
+
+	#
+	# Show ADDS alerts by Time Raised,NetBiosComputerName,Message
+	#
+	$EnableTranscriptionLogCleanup += $Message
+	$EnableTranscriptionLogCleanup += ""
+	$EnableTranscriptionLogCleanup += "# EnableTranscription LogCleanup Daily report for $($date)"
+	$EnableTranscriptionLogCleanup += "#"
+	$EnableTranscriptionLogCleanup += "# Total Files found"
+	$EnableTranscriptionLogCleanup += "#========================================================"
+	$EnableTranscriptionLogCleanup += "# EnableTranscription Files found = $($Files.Count)"
+	$EnableTranscriptionLogCleanup += ""
+	$EnableTranscriptionLogCleanup += "# Total Files found details"
+	$EnableTranscriptionLogCleanup += "#========================================================"	
+	$EnableTranscriptionLogCleanup += "$($Files)"
+	$EnableTranscriptionLogCleanup += "#========================================================"
+	$EnableTranscriptionLogCleanup += ""
+	}
+
+#$EnableTranscriptionLogCleanup
+
+# Format to string
+$EnableTranscriptionLogCleanup = $EnableTranscriptionLogCleanup | out-string
+
+
+#============================================================
+
+$Result = "GOOD"
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"$EnableTranscriptionLogCleanup")
+
+#$bag.AddValue('Result',$Result)
+$bag.AddValue('Count',$Test)
+$bag.AddValue('Message',$Message)
+$bag.AddValue('Summary',$EnableTranscriptionLogCleanup)
+
+# Return all bags
+$bag
+#=================================================================================
+# End MAIN script section
+
+
+# End of script section
+#=================================================================================
+
+#Log an event for script ending and total execution time.
+$EndTime = Get-Date
+$ScriptTime = ($EndTime - $StartTime).TotalSeconds
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"EnableTranscription LogCleanup Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 #=================================================================================
 # End of script
                 </ScriptBody>
@@ -3208,14 +4593,150 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
           </OnDemandDetections>
         </MonitorImplementation>
       </UnitMonitorType>
+      <UnitMonitorType ID="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.MonitorType" Accessibility="Internal">
+        <MonitorTypeStates>
+          <MonitorTypeState ID="RegValueExists" NoDetection="false" />
+          <MonitorTypeState ID="RegValueMissing" NoDetection="false" />
+        </MonitorTypeStates>
+        <Configuration />
+        <MonitorImplementation>
+          <MemberModules>
+            <DataSource ID="RegDS" TypeID="Windows!Microsoft.Windows.RegistryProvider">
+              <ComputerName>$Target/Host/Property[Type="Windows!Microsoft.Windows.Computer"]/NetworkName$</ComputerName>
+              <RegistryAttributeDefinitions>
+                <RegistryAttributeDefinition>
+                  <AttributeName>EnableTranscription</AttributeName>
+                  <Path>SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription</Path>
+                  <PathType>0</PathType>  <!-- 0=regKey 1=regValue -->
+                  <AttributeType>0</AttributeType>  <!-- 0=CheckIfExists (Boolean) 1=treat data as (String) 2=treat data as (Integer) -->
+                </RegistryAttributeDefinition>
+              </RegistryAttributeDefinitions>
+              <Frequency>600000</Frequency>  <!-- seconds -->
+            </DataSource>
+            <ConditionDetection ID="CDExists" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="Boolean">Values/EnableTranscription</XPathQuery>  <!-- Common options for XPathQuery Type are "Boolean" "String" "Integer" "Double" -->
+                  </ValueExpression>
+                  <Operator>Equal</Operator>  <!-- Common options for SimpleExpression Operator are "Equal" "NotEqual" "Greater" "Less" "GreaterEqual" "LessEqual" "Like" "NotLike" -->
+                  <ValueExpression>
+                    <Value Type="Boolean">true</Value>  <!-- Common options for XPathQuery Type are "Boolean" "String" "Integer" "Double" -->
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="CDMissing" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="Boolean">Values/EnableTranscription</XPathQuery>  <!-- Common options for XPathQuery Type are "Boolean" "String" "Integer" "Double" -->
+                  </ValueExpression>
+                  <Operator>Equal</Operator>  <!-- Common options for SimpleExpression Operator are "Equal" "NotEqual" "Greater" "Less" "GreaterEqual" "LessEqual" "Like" "NotLike" -->
+                  <ValueExpression>
+                    <Value Type="Boolean">false</Value>  <!-- Common options for XPathQuery Type are "Boolean" "String" "Integer" "Double" -->
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+            </ConditionDetection>
+          </MemberModules>
+          <RegularDetections>
+            <RegularDetection MonitorTypeStateID="RegValueExists">
+              <Node ID="CDExists">
+                <Node ID="RegDS" />
+              </Node>
+            </RegularDetection>
+            <RegularDetection MonitorTypeStateID="RegValueMissing">
+              <Node ID="CDMissing">
+                <Node ID="RegDS" />
+              </Node>
+            </RegularDetection>
+          </RegularDetections>
+        </MonitorImplementation>
+      </UnitMonitorType>
+      <UnitMonitorType ID="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor.MonitorType" Accessibility="Internal">
+        <MonitorTypeStates>
+          <MonitorTypeState ID="GoodCondition" NoDetection="false" />
+          <MonitorTypeState ID="BadCondition" NoDetection="false" />
+        </MonitorTypeStates>
+        <Configuration>
+		  <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+		  <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />	
+        </Configuration>
+        <OverrideableParameters>
+		  <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+		  <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+		  <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <MonitorImplementation>
+          <MemberModules>
+            <DataSource ID="DS" TypeID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Monitor.DataSource">
+			  <IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds>
+			  <SyncTime>$Config/SyncTime$</SyncTime>	
+			  <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+            </DataSource>
+            <ConditionDetection ID="GoodConditionFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">GoodCondition</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="BadConditionFilter" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <SimpleExpression>
+                  <ValueExpression>
+                    <XPathQuery Type="String">Property[@Name='Result']</XPathQuery>
+                  </ValueExpression>
+                  <Operator>Equal</Operator>
+                  <ValueExpression>
+                    <Value Type="String">BadCondition</Value>
+                  </ValueExpression>
+                </SimpleExpression>
+              </Expression>
+            </ConditionDetection>
+          </MemberModules>
+          <RegularDetections>
+            <RegularDetection MonitorTypeStateID="GoodCondition">
+              <Node ID="GoodConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+            <RegularDetection MonitorTypeStateID="BadCondition">
+              <Node ID="BadConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+          </RegularDetections>
+          <OnDemandDetections>
+            <OnDemandDetection MonitorTypeStateID="GoodCondition">
+              <Node ID="GoodConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+            <OnDemandDetection MonitorTypeStateID="BadCondition">
+              <Node ID="BadConditionFilter">
+                <Node ID="DS" />
+              </Node>
+            </OnDemandDetection>
+          </OnDemandDetections>
+        </MonitorImplementation>
+      </UnitMonitorType>
     </MonitorTypes>
   </TypeDefinitions>
   <Monitoring>
     <Rules>
-      <Rule ID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+      <Rule ID="Proactive.DailyTasks.WINOSAlerts.Close.Script.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
         <Category>Alert</Category>
         <DataSources>
-          <DataSource ID="DS" TypeID="Proactive.DailyTasks.WINOSAlerts.Close.Script.DataSource">
+          <DataSource ID="DS" TypeID="Proactive.DailyTasks.WINOSAlerts.Close.Script.Alert.Rule.DataSource">
             <TimeoutSeconds>900</TimeoutSeconds>
           </DataSource>
         </DataSources>
@@ -3223,7 +4744,7 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
           <WriteAction ID="WA" TypeID="Health!System.Health.GenerateAlert">
             <Priority>1</Priority>
             <Severity>0</Severity>
-            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.WINOSAlerts.Report.Script.Alert.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.WINOSAlerts.Close.Script.Alert.Rule.AlertMessage"]$</AlertMessageId>
             <AlertParameters>
               <AlertParameter1>$Data/Property[@Name='Count']$</AlertParameter1>
               <AlertParameter2>$Data/Property[@Name='Message']$</AlertParameter2>
@@ -3235,7 +4756,7 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
           </WriteAction>
         </WriteActions>
       </Rule>
-      <Rule ID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Task.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+      <Rule ID="Proactive.DailyTasks.WINOSAlerts.Script.Report.Task.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
         <Category>Alert</Category>
         <DataSources>
           <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
@@ -3284,7 +4805,7 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
             <AlertName />
             <AlertDescription />
             <AlertOwner />
-            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.WINOSAlerts.Report.Script.Task.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.WINOSAlerts.Script.Report.Task.Rule.AlertMessage"]$</AlertMessageId>
             <AlertParameters>
               <AlertParameter1>$Data/EventDescription$</AlertParameter1>
             </AlertParameters>
@@ -3716,7 +5237,7 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
                     </ValueExpression>
                     <Operator>Equal</Operator>
                     <ValueExpression>
-                      <Value Type="UnsignedInteger">583</Value>
+                      <Value Type="UnsignedInteger">584</Value>
                     </ValueExpression>
                   </SimpleExpression>
                 </Expression>
@@ -3737,7 +5258,7 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
                       <XPathQuery Type="String">EventDescription</XPathQuery>
                     </ValueExpression>
                     <Operator>ContainsSubstring</Operator>
-                    <Pattern>Automatic Services - WA audit for past hour</Pattern>
+                    <Pattern>Automatic Services - Hourly rule </Pattern>
                   </RegExExpression>
                 </Expression>
               </And>
@@ -4047,9 +5568,249 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
           </WriteAction>
         </WriteActions>
       </Rule>
+      <Rule ID="Proactive.DailyTasks.EnableTranscription.Report.Script.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Proactive.DailyTasks.EnableTranscription.Report.Script.DataSource">
+            <TimeoutSeconds>900</TimeoutSeconds>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="WA" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>0</Severity>
+            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.EnableTranscription.Report.Script.Alert.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/Property[@Name='Count']$</AlertParameter1>
+              <AlertParameter2>$Data/Property[@Name='Message']$</AlertParameter2>
+              <AlertParameter3>$Data/Property[@Name='Summary']$</AlertParameter3>
+            </AlertParameters>
+            <Suppression>
+              <SuppressionValue>$Data/Property[@Name='Message']$</SuppressionValue>
+            </Suppression>
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.DailyTasks.EnableTranscription.Close.Script.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Proactive.DailyTasks.EnableTranscription.Close.Script.DataSource">
+            <TimeoutSeconds>900</TimeoutSeconds>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="WA" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>0</Severity>
+            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.EnableTranscription.Close.Script.Alert.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/Property[@Name='Count']$</AlertParameter1>
+              <AlertParameter2>$Data/Property[@Name='Message']$</AlertParameter2>
+              <AlertParameter3>$Data/Property[@Name='Summary']$</AlertParameter3>
+            </AlertParameters>
+            <Suppression>
+              <SuppressionValue>$Data/Property[@Name='Message']$</SuppressionValue>
+            </Suppression>
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.DataSource">
+            <TimeoutSeconds>900</TimeoutSeconds>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="WA" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>0</Severity>
+            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Alert.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/Property[@Name='Count']$</AlertParameter1>
+              <AlertParameter2>$Data/Property[@Name='Message']$</AlertParameter2>
+              <AlertParameter3>$Data/Property[@Name='Summary']$</AlertParameter3>
+            </AlertParameters>
+            <Suppression>
+              <SuppressionValue>$Data/Property[@Name='Message']$</SuppressionValue>
+            </Suppression>
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.DailyTasks.EnableTranscription.Report.Script.Task.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
+            <LogName>Operations Manager</LogName>
+            <Expression>
+              <And>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="UnsignedInteger">618</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">PublisherName</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="String">Health Service Script</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <RegExExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">EventDescription</XPathQuery>
+                    </ValueExpression>
+                    <Operator>ContainsSubstring</Operator>
+                    <Pattern>EnableTranscription Failure Daily report for</Pattern>
+                  </RegExExpression>
+                </Expression>
+              </And>
+            </Expression>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>0</Severity>
+            <AlertName />
+            <AlertDescription />
+            <AlertOwner />
+            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.EnableTranscription.Report.Script.Task.Alert.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
+            </AlertParameters>
+            <Suppression />
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.DailyTasks.EnableTranscription.Close.Script.Task.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
+            <LogName>Operations Manager</LogName>
+            <Expression>
+              <And>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="UnsignedInteger">619</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">PublisherName</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="String">Health Service Script</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <RegExExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">EventDescription</XPathQuery>
+                    </ValueExpression>
+                    <Operator>ContainsSubstring</Operator>
+                    <Pattern>Proactive DailyTasks EnableTranscription Close Alert Report for</Pattern>
+                  </RegExExpression>
+                </Expression>
+              </And>
+            </Expression>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>0</Severity>
+            <AlertName />
+            <AlertDescription />
+            <AlertOwner />
+            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.WINOSAlerts.Script.Report.Task.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
+            </AlertParameters>
+            <Suppression />
+          </WriteAction>
+        </WriteActions>
+      </Rule>
+      <Rule ID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Task.Alert.Rule" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" ConfirmDelivery="true" Remotable="true" Priority="Normal" DiscardLevel="100">
+        <Category>Alert</Category>
+        <DataSources>
+          <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.EventProvider">
+            <LogName>Operations Manager</LogName>
+            <Expression>
+              <And>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="UnsignedInteger">EventDisplayNumber</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="UnsignedInteger">620</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <SimpleExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">PublisherName</XPathQuery>
+                    </ValueExpression>
+                    <Operator>Equal</Operator>
+                    <ValueExpression>
+                      <Value Type="String">Health Service Script</Value>
+                    </ValueExpression>
+                  </SimpleExpression>
+                </Expression>
+                <Expression>
+                  <RegExExpression>
+                    <ValueExpression>
+                      <XPathQuery Type="String">EventDescription</XPathQuery>
+                    </ValueExpression>
+                    <Operator>ContainsSubstring</Operator>
+                    <Pattern>Proactive DailyTasks EnableTranscription LogCleanup Script Report for</Pattern>
+                  </RegExExpression>
+                </Expression>
+              </And>
+            </Expression>
+          </DataSource>
+        </DataSources>
+        <WriteActions>
+          <WriteAction ID="Alert" TypeID="Health!System.Health.GenerateAlert">
+            <Priority>1</Priority>
+            <Severity>0</Severity>
+            <AlertName />
+            <AlertDescription />
+            <AlertOwner />
+            <AlertMessageId>$MPElement[Name="Proactive.DailyTasks.WINOSAlerts.Script.Report.Task.Rule.AlertMessage"]$</AlertMessageId>
+            <AlertParameters>
+              <AlertParameter1>$Data/EventDescription$</AlertParameter1>
+            </AlertParameters>
+            <Suppression />
+          </WriteAction>
+        </WriteActions>
+      </Rule>
     </Rules>
     <Tasks>
-      <Task ID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Task" Accessibility="Public" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" Timeout="120" Remotable="true">
+      <Task ID="Proactive.DailyTasks.WINOSAlerts.Script.Report.Task" Accessibility="Public" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" Timeout="120" Remotable="true">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA">
           <TimeoutSeconds>900</TimeoutSeconds>
@@ -4072,6 +5833,24 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
       <Task ID="Proactive.Microsoft.Windows.Server.2016.Eventlog.Service.Task" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" Timeout="300" Remotable="true">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Microsoft.Windows.Server.2016.Eventlog.Service.WA">
+          <TimeoutSeconds>600</TimeoutSeconds>
+        </WriteAction>
+      </Task>
+      <Task ID="Proactive.DailyTasks.EnableTranscription.Report.Script.Task" Accessibility="Public" Enabled="true" Target="SC!Microsoft.SystemCenter.AllManagementServersPool" Timeout="300" Remotable="true">
+        <Category>Custom</Category>
+        <WriteAction ID="PSWA" TypeID="Proactive.DailyTasks.EnableTranscription.Report.Script.WA">
+          <TimeoutSeconds>600</TimeoutSeconds>
+        </WriteAction>
+      </Task>
+      <Task ID="Proactive.DailyTasks.EnableTranscription.Close.Script.Task" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" Timeout="300" Remotable="true">
+        <Category>Custom</Category>
+        <WriteAction ID="PSWA" TypeID="Proactive.DailyTasks.EnableTranscription.Close.Script.WA">
+          <TimeoutSeconds>600</TimeoutSeconds>
+        </WriteAction>
+      </Task>
+      <Task ID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Task" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" Timeout="300" Remotable="true">
+        <Category>Custom</Category>
+        <WriteAction ID="PSWA" TypeID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.WA">
           <TimeoutSeconds>600</TimeoutSeconds>
         </WriteAction>
       </Task>
@@ -4132,13 +5911,13 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
             </And>
           </Expression>
           <TimerWaitInSeconds>3600</TimerWaitInSeconds>
-          <MatchCount>5</MatchCount>
+          <MatchCount>10</MatchCount>
         </Configuration>
       </UnitMonitor>
       <UnitMonitor ID="Proactive.Microsoft.Windows.Server.10.0.StorportMiniportDriver.Timedout.153.Secondary.Monitor" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.Computer" ParentMonitorID="MWSL!Microsoft.Windows.Server.Computer.HardwareAvailabilityAggregate" Remotable="true" Priority="Normal" RunAs="System!System.PrivilegedMonitoringAccount" TypeID="Proactive.Microsoft.Windows.SingleEventLogTimer2StateMonitorType" ConfirmDelivery="false">
         <Category>AvailabilityHealth</Category>
         <AlertSettings AlertMessage="Proactive.Microsoft.Windows.Server.10.0.StorportMiniportDriver.Timedout.153.Secondary.Monitor.AlertMessage">
-          <AlertOnState>Warning</AlertOnState>
+          <AlertOnState>Error</AlertOnState>
           <AutoResolve>true</AutoResolve>
           <AlertPriority>High</AlertPriority>
           <AlertSeverity>Warning</AlertSeverity>
@@ -4293,7 +6072,7 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
           <RepeatCount>5</RepeatCount>
         </Configuration>
       </UnitMonitor>
-      <UnitMonitor ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor" Accessibility="Public" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.Computer" ParentMonitorID="Health!System.Health.AvailabilityState" Remotable="true" Priority="Normal" TypeID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.MonitorType" ConfirmDelivery="true">
+      <UnitMonitor ID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.Computer" ParentMonitorID="Health!System.Health.AvailabilityState" Remotable="true" Priority="Normal" TypeID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.MonitorType" ConfirmDelivery="true">
         <Category>AvailabilityHealth</Category>
         <AlertSettings AlertMessage="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.AlertMessage">
           <AlertOnState>Warning</AlertOnState>  <!-- Warning or Error should match OperationalStates below  -->
@@ -4301,7 +6080,8 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
           <AlertPriority>Normal</AlertPriority>
           <AlertSeverity>MatchMonitorHealth</AlertSeverity>  <!-- Common options for AlertSeverity are MatchMonitorHealth, Information, Warning, Error -->
           <AlertParameters>
-            <AlertParameter1>$Data/Context/Property[@Name='Message']$</AlertParameter1> <!-- This is an example of passing property output from the script into the alert description -->
+            <AlertParameter1>$Data/Context/Property[@Name='Result']$</AlertParameter1> <!-- This is an example of passing property output from the script into the alert description -->
+            <AlertParameter2>$Data/Context/Property[@Name='Message']$</AlertParameter2> <!-- This is an example of passing property output from the script into the alert description -->
           </AlertParameters>
         </AlertSettings>
         <OperationalStates>
@@ -4311,16 +6091,48 @@ write-host "Automatic Services - Script Completed. Script Runtime: ($ScriptTime)
         <Configuration>
           <IntervalSeconds>1803</IntervalSeconds>
 		  <SyncTime>00:04</SyncTime>
-          <TimeoutSeconds>240</TimeoutSeconds>
+          <TimeoutSeconds>600</TimeoutSeconds>
 		  <MatchCount>2</MatchCount>  <!-- This is the number of consecutive matches that must be met before the monitor will change state.  Also a good example of passing in Integer data. -->
+        </Configuration>
+      </UnitMonitor>
+      <UnitMonitor ID="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.Monitor" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" ParentMonitorID="Health!System.Health.ConfigurationState" Remotable="true" Priority="Normal" TypeID="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.MonitorType" ConfirmDelivery="true">
+        <Category>Custom</Category>
+        <AlertSettings AlertMessage="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.Monitor.AlertMessage">
+          <AlertOnState>Warning</AlertOnState>  <!-- Warning or Error should match OperationalStates below  -->
+          <AutoResolve>true</AutoResolve>
+          <AlertPriority>Normal</AlertPriority>
+          <AlertSeverity>MatchMonitorHealth</AlertSeverity>  <!-- Common options for AlertSeverity are MatchMonitorHealth, Information, Warning, Error -->
+        </AlertSettings>
+        <OperationalStates>
+          <OperationalState ID="Success" MonitorTypeStateID="RegValueExists" HealthState="Success" />
+          <OperationalState ID="Warning" MonitorTypeStateID="RegValueMissing" HealthState="Warning" />  <!-- HealthState = Warning or Error -->
+        </OperationalStates>
+        <Configuration />
+      </UnitMonitor>
+      <UnitMonitor ID="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" ParentMonitorID="Health!System.Health.AvailabilityState" Remotable="true" Priority="Normal" TypeID="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor.MonitorType" ConfirmDelivery="true">
+        <Category>AvailabilityHealth</Category>
+        <AlertSettings AlertMessage="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor.AlertMessage">
+          <AlertOnState>Warning</AlertOnState>  <!-- Warning or Error should match OperationalStates below  -->
+          <AutoResolve>true</AutoResolve>
+          <AlertPriority>Normal</AlertPriority>
+          <AlertSeverity>MatchMonitorHealth</AlertSeverity>  <!-- Common options for AlertSeverity are MatchMonitorHealth, Information, Warning, Error -->
+        </AlertSettings>
+        <OperationalStates>
+          <OperationalState ID="GoodCondition" MonitorTypeStateID="GoodCondition" HealthState="Success" />
+          <OperationalState ID="BadCondition" MonitorTypeStateID="BadCondition" HealthState="Warning" />  <!-- HealthState = Warning or Error -->
+        </OperationalStates>
+        <Configuration>
+          <IntervalSeconds>86396</IntervalSeconds>
+		  <SyncTime></SyncTime>
+          <TimeoutSeconds>300</TimeoutSeconds>
         </Configuration>
       </UnitMonitor>
     </Monitors>
     <Recoveries>
-      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
+      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1062.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1076.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -4344,7 +6156,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1062.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1076.ps1"
 $EventID = "587"
 #=================================================================================
 
@@ -4609,6 +6421,22 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#	}
 
+	# Cleanup PowerShell transcription log files for STIG V-230220
+	#=====================
+	$BackupFolder = "c:\windows\PSLogs"
+	if ( Test-Path $BackupFolder )
+		{ 
+		$Date = Get-date
+		$DaysToDelete = "5"
+		$NewDate = ($Date).AddDays(-$DaysToDelete)
+ 
+		$Files = Get-ChildItem -Path $BackupFolder -Directory | Where-Object {($_.CreationTime -lt $Newdate)}
+		ForEach ($File in $Files)
+			{
+			remove-item -Path $file.fullname -Recurse -force -verbose
+			}
+		}
+
 	# D drive Event cleanup
 	#$DeviceDriveLetter
 	#If ( $DeviceDriveLetter -eq "D:" )
@@ -4799,10 +6627,10 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
           <TimeoutSeconds>360</TimeoutSeconds>
         </WriteAction>
       </Recovery>
-      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
+      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1062.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1076.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -4826,7 +6654,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1062.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1076.ps1"
 $EventID = "588"
 #=================================================================================
 
@@ -5281,10 +7109,10 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
           <TimeoutSeconds>360</TimeoutSeconds>
         </WriteAction>
       </Recovery>
-      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
+      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.C2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1062.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1076.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -5308,7 +7136,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1062.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery.v1076.ps1"
 $EventID = "587"
 #=================================================================================
 
@@ -5573,6 +7401,22 @@ If ($DiskFreeSpace.FreeSpace -lt 15 )
 	#	get-childitem $Path -Recurse -Depth 1 -EA SilentlyContinue | where { $_.lastAccesstime -lt $RecentUse -and $_.CreationTime -lt $HowOld -and $_.LastWriteTime -lt $RecentUse } | remove-item -force -verbose
 	#	}
 
+	# Cleanup PowerShell transcription log files for STIG V-230220
+	#=====================
+	$BackupFolder = "c:\windows\PSLogs"
+	if ( Test-Path $BackupFolder )
+		{ 
+		$Date = Get-date
+		$DaysToDelete = "5"
+		$NewDate = ($Date).AddDays(-$DaysToDelete)
+ 
+		$Files = Get-ChildItem -Path $BackupFolder -Directory | Where-Object {($_.CreationTime -lt $Newdate)}
+		ForEach ($File in $Files)
+			{
+			remove-item -Path $file.fullname -Recurse -force -verbose
+			}
+		}
+
 	# D drive Event cleanup
 	#$DeviceDriveLetter
 	#If ( $DeviceDriveLetter -eq "D:" )
@@ -5763,10 +7607,10 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
           <TimeoutSeconds>360</TimeoutSeconds>
         </WriteAction>
       </Recovery>
-      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
+      <Recovery ID="Proactive.Microsoft.Windows.LogicalDisk.D2.Cleanup.Monitor.Recovery" Accessibility="Public" Enabled="false" Target="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Legacy.LogicalDisk.FreeSpace.Monitor" ResetMonitor="true" ExecuteOnState="Error" Remotable="true" Timeout="600">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1062.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1076.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive logical disk cleanup recovery
@@ -5790,7 +7634,7 @@ $DriveLetter
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1062.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.LogicalDisk.D.Cleanup.Monitor.Recovery.v1076.ps1"
 $EventID = "588"
 #=================================================================================
 
@@ -6248,7 +8092,7 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"WINOS Cleanup Script Completed. `
       <Recovery ID="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.Computer" Monitor="Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="300">
         <Category>Custom</Category>
         <WriteAction ID="PSWA" TypeID="Windows!Microsoft.Windows.PowerShellWriteAction">
-          <ScriptName>Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1062.ps1</ScriptName>
+          <ScriptName>Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1076.ps1</ScriptName>
           <ScriptBody>
 #=================================================================================
 #  Proactive Group Policy System Event ID 1096 recovery
@@ -6268,7 +8112,7 @@ $ComputerName = $env:ComputerName
 # Constants section - modify stuff here:
 #=================================================================================
 # Assign script name variable for use in event logging.
-$ScriptName = "Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1062.ps1"
+$ScriptName = "Proactive.Microsoft.Windows.Server.GroupPolicy.EventID.1096.Monitor.Recovery.v1076.ps1"
 $EventID = "589"
 #=================================================================================
 
@@ -6373,7 +8217,7 @@ $bag
 #Log an event for script ending and total execution time.
 $EndTime = Get-Date
 $ScriptTime = ($EndTime - $StartTime).TotalSeconds
-$momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
+$momapi.LogScriptEvent($ScriptName,$EventID,0,"Script Completed. `n Script Runtime: ($ScriptTime) seconds.")
 #=================================================================================
 # End of script
 		  </ScriptBody>
@@ -6386,8 +8230,27 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
           <TimeoutSeconds>300</TimeoutSeconds>
         </WriteAction>
       </Recovery>
+      <Recovery ID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Recovery" Accessibility="Public" Enabled="true" Target="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" Monitor="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor" ResetMonitor="true" ExecuteOnState="Warning" Remotable="true" Timeout="300">
+         <Category>Custom</Category>
+        <WriteAction ID="PSWA" TypeID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.WA">
+          <TimeoutSeconds>300</TimeoutSeconds>
+        </WriteAction>
+      </Recovery>
     </Recoveries>
     <Overrides>
+      <MonitorConfigurationOverride ID="Override.Frequency.Microsoft.Windows.Server.10.0.Processor.CPUUtilization" Context="MWS6D!Microsoft.Windows.Server.10.0.Processor" Enforced="false" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Processor.CPUUtilization" Parameter="Frequency">
+        <Value>300</Value>
+      </MonitorConfigurationOverride>
+      <MonitorConfigurationOverride ID="Override.Samples.Microsoft.Windows.Server.10.0.Processor.CPUUtilization" Context="MWS6D!Microsoft.Windows.Server.10.0.Processor" Enforced="false" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Processor.CPUUtilization" Parameter="NumSamples">
+        <Value>12</Value>
+      </MonitorConfigurationOverride>
+      <MonitorConfigurationOverride ID="Override.Threshold.Microsoft.Windows.Server.10.0.Processor.CPUUtilization" Context="MWS6D!Microsoft.Windows.Server.10.0.Processor" Enforced="false" Monitor="MWS6M!Microsoft.Windows.Server.10.0.Processor.CPUUtilization" Parameter="Threshold">
+        <Value>95</Value>
+      </MonitorConfigurationOverride>
+      <MonitorConfigurationOverride ID="Override.Samples.Microsoft.Windows.Server.10.0.OperatingSystem.MemoryAvailableMBytes" Context="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" Enforced="false" Monitor="MWS6M!Microsoft.Windows.Server.10.0.OperatingSystem.MemoryAvailableMBytes" Parameter="NumSamples">
+        <Value>4</Value>
+      </MonitorConfigurationOverride>
+
       <MonitorPropertyOverride ID="Override.Microsoft.Windows.Server.10.0.StorportMiniportDriver.Timedout.153.Monitor" Context="MWS6D!Microsoft.Windows.Server.10.0.Computer" Enforced="false" Monitor="MWS6M!Microsoft.Windows.Server.10.0.StorportMiniportDriver.Timedout.153.Monitor" Property="Enabled">
         <Value>false</Value>
       </MonitorPropertyOverride>
@@ -6397,12 +8260,40 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
       <MonitorPropertyOverride ID="Override.Severity.Microsoft.Windows.Server.10.0.MaxConcurrentAPI.Monitor" Context="Windows!Microsoft.Windows.OperatingSystem" Enforced="false" Monitor="MWS6M!Microsoft.Windows.Server.10.0.MaxConcurrentAPI.Monitor" Property="AlertSeverity">
         <Value>Warning</Value>
       </MonitorPropertyOverride>
+      <MonitorPropertyOverride ID="Override.Disable.Microsoft.Windows.Server.10.0.LogicalDisk.FreeSpaceMonitorRollup" Context="MWS6D!Microsoft.Windows.Server.10.0.LogicalDisk" Enforced="false" Monitor="MWS6M!Microsoft.Windows.Server.10.0.LogicalDisk.FreeSpaceMonitorRollup" Property="Enabled">
+        <Value>false</Value>
+      </MonitorPropertyOverride>
+      <MonitorPropertyOverride ID="Override.Disable.Microsoft.Windows.Server.10.0.NetworkAdapter.PercentBandwidthUsedTotal" Context="MWS6D!Microsoft.Windows.Server.10.0.NetworkAdapter" Enforced="false" Monitor="MWS6M!Microsoft.Windows.Server.10.0.NetworkAdapter.PercentBandwidthUsedTotal" Property="Enabled">
+        <Value>false</Value>
+      </MonitorPropertyOverride>
+
+      <RulePropertyOverride ID="Override.Disable.Microsoft.Windows.Server.10.0.NetworkAdapter.PercentBandwidthUsedTotal.Collection" Context="MWS6D!Microsoft.Windows.Server.10.0.NetworkAdapter" Enforced="false" Rule="MWS6M!Microsoft.Windows.Server.10.0.NetworkAdapter.PercentBandwidthUsedTotal.Collection" Property="Enabled">
+        <Value>false</Value>
+      </RulePropertyOverride>
+      <RulePropertyOverride ID="Override.Disable.Microsoft.Windows.Server.10.0.NetworkAdapter.CurrentBandwidth.Collection" Context="MWS6D!Microsoft.Windows.Server.10.0.NetworkAdapter" Enforced="false" Rule="MWS6M!Microsoft.Windows.Server.10.0.NetworkAdapter.CurrentBandwidth.Collection" Property="Enabled">
+        <Value>false</Value>
+      </RulePropertyOverride>
+      <RulePropertyOverride ID="Override.Disable.Microsoft.Windows.Server.10.0.OperatingSystem.MemoryPoolPagedBytes.Collection" Context="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" Enforced="false" Rule="MWS6M!Microsoft.Windows.Server.10.0.OperatingSystem.MemoryPoolPagedBytes.Collection" Property="Enabled">
+        <Value>false</Value>
+      </RulePropertyOverride>
+      <RulePropertyOverride ID="Override.Disable.Microsoft.Windows.Server.10.0.OperatingSystem.MemoryPoolNonPagedBytes.Collection" Context="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" Enforced="false" Rule="MWS6M!Microsoft.Windows.Server.10.0.OperatingSystem.MemoryPoolNonPagedBytes.Collection" Property="Enabled">
+        <Value>false</Value>
+      </RulePropertyOverride>
+      <RulePropertyOverride ID="Override.Disable.Microsoft.Windows.Server.10.0.OperatingSystem.MemoryPagesPerSec.Collection" Context="MWS6D!Microsoft.Windows.Server.10.0.OperatingSystem" Enforced="false" Rule="MWS6M!Microsoft.Windows.Server.10.0.OperatingSystem.MemoryPagesPerSec.Collection" Property="Enabled">
+        <Value>false</Value>
+      </RulePropertyOverride>
+      <RulePropertyOverride ID="Override.Disable.Microsoft.Windows.Server.10.0.LogicalProcessor.PercentProcessorTime.Collection" Context="MWS6D!Microsoft.Windows.Server.10.0.LogicalProcessor" Enforced="false" Rule="MWS6M!Microsoft.Windows.Server.10.0.LogicalProcessor.PercentProcessorTime.Collection" Property="Enabled">
+        <Value>false</Value>
+      </RulePropertyOverride>
+      <RulePropertyOverride ID="Override.Disable.Microsoft.Windows.Server.10.0.Processor.PercentProcessorTime.Collection" Context="MWS6D!Microsoft.Windows.Server.10.0.Processor" Enforced="false" Rule="MWS6M!Microsoft.Windows.Server.10.0.Processor.PercentProcessorTime.Collection" Property="Enabled">
+        <Value>false</Value>
+      </RulePropertyOverride>
     </Overrides>
   </Monitoring>
   <Presentation>
     <StringResources>
-      <StringResource ID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Alert.Rule.AlertMessage" />
-      <StringResource ID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Task.Rule.AlertMessage" />
+      <StringResource ID="Proactive.DailyTasks.WINOSAlerts.Close.Script.Alert.Rule.AlertMessage" />
+      <StringResource ID="Proactive.DailyTasks.WINOSAlerts.Script.Report.Task.Rule.AlertMessage" />
       <StringResource ID="Proactive.Microsoft.Windows.Server.10.0.StorportMiniportDriver.Timedout.153.Monitor.AlertMessage" />
       <StringResource ID="Proactive.Microsoft.Windows.Server.10.0.StorportMiniportDriver.Timedout.153.Secondary.Monitor.AlertMessage" />
       <StringResource ID="Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.AlertMessage" />
@@ -6421,6 +8312,14 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
       <StringResource ID="Proactive.Microsoft.Windows.2016.AutomaticServices.FoundRunning.Recovery.Rule.AlertMessage" />
       <StringResource ID="Proactive.Microsoft.Windows.2016.AutomaticServices.RecoveryFailed.Recovery.Rule.AlertMessage" />
       <StringResource ID="Proactive.Microsoft.Windows.2016.AutomaticServices.TooManyRecoveryAttempts.Recovery.Rule.AlertMessage" />
+      <StringResource ID="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.Monitor.AlertMessage" />
+      <StringResource ID="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor.AlertMessage" />
+      <StringResource ID="Proactive.DailyTasks.EnableTranscription.Report.Script.Alert.Rule.AlertMessage" />
+      <StringResource ID="Proactive.DailyTasks.EnableTranscription.Close.Script.Alert.Rule.AlertMessage" />
+      <StringResource ID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Alert.Rule.AlertMessage" />
+      <StringResource ID="Proactive.DailyTasks.EnableTranscription.Report.Script.Task.Alert.Rule.AlertMessage" />
+      <StringResource ID="Proactive.DailyTasks.EnableTranscription.Close.Script.Task.Alert.Rule.AlertMessage" />
+      <StringResource ID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Task.Alert.Rule.AlertMessage" />
     </StringResources>
   </Presentation>
   <LanguagePacks>
@@ -6429,6 +8328,18 @@ $momapi.LogScriptEvent($ScriptName,$EventID,0,"`n Script Completed. `n Script Ru
         <DisplayString ElementID="Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum">
           <Name>Microsoft Windows Server Operating System 2016+ Monitoring Addendum</Name>
           <Description>
+v1.0.7.6 13 Jan 2025 Updated EnableTranscription Report variables
+v1.0.7.5  8 Nov 2024 Added additional services into excluded services, uncommented ServiceName variable
+v1.0.7.4  7 Nov 2024 Updated ExcludedServices in AutomaticServices monitor DS
+v1.0.7.3 21 Oct 2024 Logical Disk rollup disable, hourly monitor setting changes, event and perf collection rule disabled
+v1.0.7.2 21 Oct 2024 Updated AutomaticServices DS/WA workflows
+v1.0.7.1 18 Oct 2024 Updated Excluded Services array with additional services, updated AutomaticServices DS/WA workflows.
+v1.0.7.0 17 Oct 2024 Updated AutomaticServices monitor timeout from 240 to 600 for OpsMgr event ID 22404
+v1.0.6.8 16 Oct 2024 Updated Storport Timed Out Monitor from 5 to 10 events per hour
+v1.0.6.8 11 Oct 2024 Additional EnableTranscription workflows - reports, report cleanup, transcription log cleanup
+v1.0.6.7 11 Apr 2024 New weekly PowerShell Enable Transcription monitor for STIG V-257502 and V-257503, and new weekly report
+v1.0.6.5 10 Apr 2024 Updated recovery logic for AutomaticServices DS/WA
+v1.0.6.4  9 Apr 2024 Updated AutomaticServices DS/WA logic change, ServiceName variable change to Service
 v1.0.6.2 20 Jan 2024 New AutomaticServices workflow DS/WA for monitor/rules.  Includes alerts, recovery rules, changed EventID's
 v1.0.5.9  4 Jan 2024 Resolution State logic improvements for large environments
 v1.0.5.8 27 Dec 2023 Updated whitespace and monitor/rule reset logic updates, Recovery WA like TopProcess
@@ -6451,7 +8362,7 @@ v1.0.1.9 28 Jan 2022 Updated 153 StorPort event logic, alert message
 v1.0.1.3 10 Sep 2021 Update with MatchCount for StorPort monitor
 v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Description>
         </DisplayString>
-        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Close.Script.DataSource">
+        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Close.Script.Alert.Rule.DataSource">
           <Name>Proactive DailyTasks WINOSAlerts report and auto-close DataSource</Name>
           <Description>This datasource generates WINOSAlerts report and auto-close DataSource</Description>
         </DisplayString>
@@ -6475,7 +8386,19 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
           <Name>Proactive Microsoft Windows 2016 AutomaticServices Monitor DataSource</Name>
           <Description>This datasource identifies and restarts any automatic services NOT in running state.</Description>
         </DisplayString>
-
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Report.Script.DataSource">
+          <Name>Proactive Microsoft Windows 2016 Enable Transcription Report DataSource</Name>
+          <Description>This datasource builds a report of Enable Transcription 2016+ alerts</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.DataSource">
+          <Name>Proactive Microsoft Windows 2016 Enable Transcription Report DataSource</Name>
+          <Description>This EnableTranscription datasource cleans up PoSH logs on Windows Operating System.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Monitor.DataSource">
+          <Name>Proactive Microsoft Windows 2016 EnableTranscription LogCleanup Monitor DataSource</Name>
+          <Description>This EnableTranscription monitor datasource cleans up PoSH logs on Windows Operating System.</Description>
+        </DisplayString>
+		
         <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.2016.Close.Script.Alert.WA">
           <Name>Proactive DailyTasks WINOSAlerts report and auto-close on-demand task</Name>
           <Description>This write-action task generates WINOSAlerts report and auto-close DataSource</Description>
@@ -6492,6 +8415,18 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
           <Name>Proactive Microsoft Windows Server Automatic Services Hourly WA</Name>
           <Description>This write-action task identifies and restarts any automatic services NOT in running state.</Description>
         </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Report.Script.WA">
+          <Name>Proactive DailyTasks EnableTranscription Report Script WA</Name>
+          <Description>This write-action task summarizes EnableTranscription alerts</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Close.Script.WA">
+          <Name>Proactive Dailytasks EnableTranscription Close Report Script WA</Name>
+          <Description>This write-action task closes open Dailytasks EnableTranscription alerts.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.WA">
+          <Name>Proactive DailyTasks EnableTranscription Log file cleanup Script WA</Name>
+          <Description>This write-action task cleans up log files per STIG.</Description>
+        </DisplayString>
 
         <DisplayString ElementID="Proactive.WINOS.Repeated.Event.MonitorType">
           <Name>Proactive WINOS Repeated Event MonitorType</Name>
@@ -6505,22 +8440,28 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
         <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Monitor.MonitorType">
           <Name>Proactive Microsoft Windows Automatic Services Warning Monitor MonitorType</Name>
         </DisplayString>
-
-        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Alert.Rule">
-          <Name>Proactive DailyTasks WINOSAlerts Report Script Alert Rule</Name>
-          <Description>Proactive Scheduled rule to kick off datasource at 0615 M-F</Description>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.MonitorType">
+          <Name>Proactive Microsoft Windows Server RegValueExists EnableTranscription MonitorType</Name>
+          <Description>Monitor Type to check a registry key existence</Description>
         </DisplayString>
-        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Alert.Rule.AlertMessage">
-          <Name>Proactive DailyTasks WINOSAlerts Report Script Alert Rule</Name>
-          <Description>{1}
-
-{2}</Description>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor.MonitorType">
+          <Name>Proactive Microsoft Windows Server RegValueExists EnableTranscription MonitorType</Name>
+          <Description>Monitor Type to check a registry key existence</Description>
         </DisplayString>
-        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Task.Alert.Rule">
+
+        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Close.Script.Alert.Rule">
+          <Name>Proactive DailyTasks WINOSAlerts Close Script Alert Rule Alert Rule</Name>
+          <Description>Proactive Scheduled rule to kick off datasource M-F</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Close.Script.Alert.Rule.AlertMessage">
+          <Name>Proactive DailyTasks WINOSAlerts Close Script Alert Rule Alert Rule</Name>
+          <Description>{2}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Script.Report.Task.Alert.Rule">
           <Name>Proactive DailyTasks WINOSAlerts task Report Manual Task Rule</Name>
         </DisplayString>
-        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Task.Rule.AlertMessage">
-          <Name>Proactive DailyTasks WINOSAlerts Report Script Task Rule Alert</Name>
+        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Script.Report.Task.Rule.AlertMessage">
+          <Name>Proactive DailyTasks WINOSAlerts Script Report Task Rule Alert</Name>
           <Description>{0}</Description>
         </DisplayString>
         <DisplayString ElementID="Proactive.Microsoft.Windows.LogicalDisk.Cleanup.Script.Task.Alert.Rule">
@@ -6586,7 +8527,7 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
         </DisplayString>
         <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.Hourly.TimedPowerShell.Event.Rule.AlertMessage">
           <Name>Proactive Microsoft Windows 2016 Automatic Services Hourly Event Alert Rule</Name>
-          <Description>{0}</Description>
+          <Description>{1}</Description>
         </DisplayString>
         <DisplayString ElementID="Proactive.Microsoft.Windows.2016.AutomaticServices.NotFound.Recovery.Rule">
           <Name>Microsoft Windows Server 2016 AutomaticServices Service Recovery Failed - Service Not Found Rule</Name>
@@ -6616,8 +8557,56 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
           <Name>Microsoft Windows Server 2016 AutomaticServices Service Recovery has attempted to recover the service too many times</Name>
           <Description>Event Description: {0}</Description>
 		</DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Report.Script.Alert.Rule">
+          <Name>Proactive DailyTasks EnableTranscription Report Script Alert Rule</Name>
+          <Description>Proactive workflow builds report of EnableTranscription alerts</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Report.Script.Alert.Rule.AlertMessage">
+          <Name>Proactive DailyTasks EnableTranscription Report Script Alert Rule</Name>
+          <Description>{2}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Close.Script.Alert.Rule">
+          <Name>Proactive DailyTasks EnableTranscription Close Script Alert Rule</Name>
+          <Description>Proactive workflow closes EnableTranscription alerts</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Close.Script.Alert.Rule.AlertMessage">
+          <Name>Proactive DailyTasks EnableTranscription Close Script Alert Rule</Name>
+          <Description>{2}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Alert.Rule">
+          <Name>Proactive DailyTasks EnableTranscription LogCleanup Script Alert Rule</Name>
+          <Description>Proactive EnableTranscription LogCleanup workflow cleans up daily PoSH logfiles.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Alert.Rule.AlertMessage">
+          <Name>Proactive DailyTasks EnableTranscription LogCleanup Script Alert Rule</Name>
+          <Description>{2}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Report.Script.Task.Alert.Rule">
+          <Name>Proactive DailyTasks EnableTranscription LogCleanup Script Task Alert Rule</Name>
+          <Description>Proactive EnableTranscription LogCleanup workflow cleans up daily PoSH logfiles.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Report.Script.Task.Alert.Rule.AlertMessage">
+          <Name>Proactive DailyTasks EnableTranscription LogCleanup Script Task Alert Rule</Name>
+          <Description>{2}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Close.Script.Task.Alert.Rule">
+          <Name>Proactive DailyTasks EnableTranscription LogCleanup Script Task Alert Rule</Name>
+          <Description>Proactive EnableTranscription LogCleanup workflow cleans up daily PoSH logfiles.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Close.Script.Task.Alert.Rule.AlertMessage">
+          <Name>Proactive DailyTasks EnableTranscription LogCleanup Script Task Alert Rule</Name>
+          <Description>{2}</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Task.Alert.Rule">
+          <Name>Proactive DailyTasks EnableTranscription LogCleanup Script Task Alert Rule</Name>
+          <Description>Proactive EnableTranscription LogCleanup workflow cleans up daily PoSH logfiles.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Task.Alert.Rule.AlertMessage">
+          <Name>Proactive DailyTasks EnableTranscription LogCleanup Script Task Alert Rule</Name>
+          <Description>{2}</Description>
+        </DisplayString>
 
-        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Report.Script.Task">
+        <DisplayString ElementID="Proactive.DailyTasks.WINOSAlerts.Script.Report.Task">
           <Name>Proactive DailyTasks WINOSAlerts Autoclose Report Script Task</Name>
           <Description>Proactive DailyTasks WINOSAlerts AutoClose task to kick off on-demand</Description>
         </DisplayString>
@@ -6632,6 +8621,18 @@ v1.0.0.0  6 Apr 2021 Created management pack for auto closure cleanup</Descripti
         <DisplayString ElementID="Proactive.Microsoft.Windows.Server.2016.Eventlog.Service.Task">
           <Name>Proactive Microsoft Windows Server 2016+ EventLog service script restart task</Name>
           <Description>Proactive Microsoft Windows Server 2016+ restarts EventLog service</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Report.Script.Task">
+          <Name>Proactive DailyTasks EnableTranscription LogCleanup script report task</Name>
+          <Description>Proactive DailyTasks EnableTranscription LogCleanup script report task</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.Close.Script.Task">
+          <Name>Proactive DailyTasks EnableTranscription close script task</Name>
+          <Description>Proactive DailyTasks EnableTranscription close script task</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Task">
+          <Name>Proactive DailyTasks EnableTranscription Log cleanup script task</Name>
+          <Description>Proactive DailyTasks EnableTranscription Log cleanup script task</Description>
         </DisplayString>
 
         <DisplayString ElementID="Proactive.Microsoft.Windows.Server.10.0.StorportMiniportDriver.Timedout.153.Monitor">
@@ -6727,6 +8728,36 @@ Time Window End: $Data/Context/TimeWindowEnd$</Description>
 Summary:
 {1}</Description>
         </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.Monitor">
+          <Name>Proactive Microsoft Windows Server RegValueExists EnableTranscription Monitor</Name>
+          <Description></Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.Monitor" SubElementID="Success">
+          <Name>RegValueExists</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.Monitor" SubElementID="Warning">
+          <Name>RegValueMissing</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.RegValueExists.EnableTranscription.Monitor.AlertMessage">
+          <Name>Microsoft Windows Server RegValueExists EnableTranscription Monitor Alert</Name>
+          <Description>Alert showing server is NOT compliant for Windows STIGS V-257502, V-257503
+		  Proactive Microsoft Windows Server RegValueExists EnableTranscription Monitor detected the registry path SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription is missing.
+		  Target GPO or create missing registry keys per STIG to resolve.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor">
+          <Name>Proactive Microsoft Windows Server EnableTranscription Monitor</Name>
+          <Description></Description>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor" SubElementID="GoodCondition">
+          <Name>Good Condition</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor" SubElementID="BadCondition">
+          <Name>Bad Condition</Name>
+        </DisplayString>
+        <DisplayString ElementID="Proactive.Microsoft.Windows.Server.EnableTranscription.Monitor.AlertMessage">
+          <Name>Proactive Microsoft Windows Server EnableTranscription Monitor: Failure</Name>
+          <Description>Proactive Microsoft Windows Server EnableTranscription Monitor: detected a bad condition</Description>
+        </DisplayString>
 
         <DisplayString ElementID="Proactive.Microsoft.Windows.LogicalDisk.C.Cleanup.Monitor.Recovery">
           <Name>Proactive Microsoft Windows LogicalDisk C Cleanup Monitor Recovery</Name>
@@ -6748,6 +8779,10 @@ Summary:
           <Name>Microsoft Windows Server 2016+ EventLog service Monitor Error Recovery</Name>
           <Description>Restarts EventLog service on server if stopped</Description>
         </DisplayString>
+        <DisplayString ElementID="Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Recovery">
+          <Name>Proactive.DailyTasks.EnableTranscription.LogCleanup.Script.Recovery</Name>
+          <Description>Adds </Description>
+        </DisplayString>
 
         <DisplayString ElementID="Override.Microsoft.Windows.Server.10.0.StorportMiniportDriver.Timedout.153.Monitor">
           <Name>Override Proactive Storport Miniport Driver Timed Out Monitor</Name>
@@ -6759,6 +8794,58 @@ Summary:
         <DisplayString ElementID="Override.Severity.Microsoft.Windows.Server.10.0.MaxConcurrentAPI.Monitor">
           <Name>NotUsed</Name>
           <Description>24 Apr 2023 - KWJ - Editing alert from critical to warning</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Disable.Microsoft.Windows.Server.10.0.LogicalDisk.FreeSpaceMonitorRollup">
+          <Name>NotUsed</Name>
+          <Description>30Oct2024 - Disabling RollUp as both monitors are disabled.</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Disable.Microsoft.Windows.Server.10.0.NetworkAdapter.PercentBandwidthUsedTotal">
+          <Name>NotUsed</Name>
+          <Description>30Oct2024 - Disabling Network adapter monitor</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Disable.Microsoft.Windows.Server.10.0.NetworkAdapter.PercentBandwidthUsedTotal.Collection">
+          <Name>NotUsed</Name>
+          <Description>30Oct2024 - Disabling perf collection rule</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Disable.Microsoft.Windows.Server.10.0.NetworkAdapter.CurrentBandwidth.Collection">
+          <Name>NotUsed</Name>
+          <Description>30Oct2024 - Disabling perf collection rule</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Frequency.Microsoft.Windows.Server.10.0.Processor.CPUUtilization">
+          <Name>NotUsed</Name>
+          <Description>30 Oct 2024 - Changing processor monitor to hourly 5 minute interval, 12 samples alert</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Samples.Microsoft.Windows.Server.10.0.Processor.CPUUtilization">
+          <Name>NotUsed</Name>
+          <Description>30 Oct 2024 - Changing processor monitor to hourly 5 minute interval, 12 samples alert</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Threshold.Microsoft.Windows.Server.10.0.Processor.CPUUtilization">
+          <Name>NotUsed</Name>
+          <Description>30 Oct 2024 - Changing processor monitor to 98% CPU for hourly CPU alert</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Samples.Microsoft.Windows.Server.10.0.OperatingSystem.MemoryAvailableMBytes">
+          <Name>NotUsed</Name>
+          <Description>30 Oct 2024 - Changing processor monitor to hourly 4 samples alert</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Disable.Microsoft.Windows.Server.10.0.OperatingSystem.MemoryPoolPagedBytes.Collection">
+          <Name>NotUsed</Name>
+          <Description>30 Oct 2024 - Disabling perf collection rule</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Disable.Microsoft.Windows.Server.10.0.OperatingSystem.MemoryPoolNonPagedBytes.Collection">
+          <Name>NotUsed</Name>
+          <Description>30 Oct 2024 - Disabling perf collection rule</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Disable.Microsoft.Windows.Server.10.0.OperatingSystem.MemoryPagesPerSec.Collection">
+          <Name>NotUsed</Name>
+          <Description>30 Oct 2024 - Disabling perf collection rule</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Disable.Microsoft.Windows.Server.10.0.LogicalProcessor.PercentProcessorTime.Collection">
+          <Name>NotUsed</Name>
+          <Description>30 Oct 2024 - Disabling perf collection rule</Description>
+        </DisplayString>
+        <DisplayString ElementID="Override.Disable.Microsoft.Windows.Server.10.0.Processor.PercentProcessorTime.Collection">
+          <Name>NotUsed</Name>
+          <Description>30 Oct 2024 - Disabling perf collection rule</Description>
         </DisplayString>
       </DisplayStrings>
     </LanguagePack>
