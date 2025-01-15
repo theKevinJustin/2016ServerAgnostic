@@ -1,5 +1,5 @@
 # 2016ServerAgnostic
-Microsoft Windows Server Operating System 2016 Monitoring Addendum v1.0.6.2
+Microsoft Windows Server Operating System 2016 Monitoring Addendum v1.0.7.6
 
 Download [here](https://github.com/theKevinJustin/2016ServerAgnostic/blob/main/Microsoft.Windows.Server.Operating.System.2016.Monitoring.Addendum.xml)
 
@@ -10,6 +10,18 @@ Blog [https://kevinjustin.com/blog/2023/08/28/os-addendum-packs/](https://kevinj
 
 # Version History:
 ```
+v1.0.7.6 13 Jan 2025 Updated EnableTranscription Report variables
+v1.0.7.5  8 Nov 2024 Added additional services into excluded services, uncommented ServiceName variable
+v1.0.7.4  7 Nov 2024 Updated ExcludedServices in AutomaticServices monitor DS
+v1.0.7.3 21 Oct 2024 Logical Disk rollup disable, hourly monitor setting changes, event and perf collection rule disabled
+v1.0.7.2 21 Oct 2024 Updated AutomaticServices DS/WA workflows
+v1.0.7.1 18 Oct 2024 Updated Excluded Services array with additional services, updated AutomaticServices DS/WA workflows.
+v1.0.7.0 17 Oct 2024 Updated AutomaticServices monitor timeout from 240 to 600 for OpsMgr event ID 22404
+v1.0.6.8 16 Oct 2024 Updated Storport Timed Out Monitor from 5 to 10 events per hour
+v1.0.6.8 11 Oct 2024 Additional EnableTranscription workflows - reports, report cleanup, transcription log cleanup
+v1.0.6.7 11 Apr 2024 New weekly PowerShell Enable Transcription monitor for STIG V-257502 and V-257503, and new weekly report
+v1.0.6.5 10 Apr 2024 Updated recovery logic for AutomaticServices DS/WA
+v1.0.6.4  9 Apr 2024 Updated AutomaticServices DS/WA logic change, ServiceName variable change to Service
 v1.0.6.2 19 Jan 2024 New AutomaticServices workflow DS/WA for monitor/rules.  Includes alerts, recovery rules, changed EventID's
 v1.0.5.9  4 Jan 2024 Resolution State logic improvements for large environments
 v1.0.5.8 27 Dec 2023 Updated whitespace and monitor/rule reset logic updates, Recovery WA like TopProcess
